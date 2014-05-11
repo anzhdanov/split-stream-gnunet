@@ -1,0 +1,35 @@
+\begin{thebibliography}{1}
+
+\bibitem{castro2}
+M.~Castro, P.~Druschel, A-M. Kermarrec, A.~Nandi, A.~Rowstron, and A.~Singh.
+\newblock Splitstream: High-bandwidth content distribution in a cooperative
+  environment.
+\newblock In {\em IPTPS'03}, 2003.
+
+\bibitem{castro1}
+M.~Castro, P.~Druschel, A-M. Kermarrec, A.~Nandi, A.~Rowstron, and A.~Singh.
+\newblock Splitstream: High-bandwidth multicast in a cooperative environment.
+\newblock In {\em SOSP'03}, Lake Bolton, New York, 2003.
+
+\bibitem{castro3}
+M.~Castro, P.~Druschel, A-M. Kermarrec, and A.~Rowstron.
+\newblock Scalable application-level anycast for highly dynamic groups.
+\newblock In {\em NGC}, Munich, Germany, 2003.
+
+\bibitem{GNUnet}
+GNUnet. https://gnunet.org/.
+
+\bibitem{FreePastry}
+FreePastry. http://www.freepastry.org.
+
+\bibitem{Planetlab}
+Planetlab. http://www.planet lab.org.
+
+\bibitem{Rowstron}
+A.~Rowstron and P.~Druschel.
+\newblock Pastry: Scalable, distributed object location and routing for
+  large-scale peer-to-peer systems.
+\newblock In {\em IFIP/ACM International Conference on Distributed Systems
+  Platforms (Middleware)}, pages 329--350, Heidelberg, Germany, 2001.
+
+\end{thebibliography}

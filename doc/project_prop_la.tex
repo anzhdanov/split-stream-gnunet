@@ -11,20 +11,18 @@
 \maketitle
 
 \section{Problem description}
-We are planning to study a problem of high-bandwidth multicast in cooperative environments. 
-A tree-based multicast works well in systems with high availability of interior nodes. 
-However, the latter is a problem for the application level mulicast in peer-to-peer systems. 
-SplitStream \cite{castro1} solves the problem by redistributing the content among interior-node-disjoint
+In peer-to-peer systems application multicast has become an attractive alternative to IP multicast, since multicast infrastructure is not widely available. Conventional tree-based multicasting is not the best choice for cooperative environments, because the load of forwarding multicast traffic is handled by the peers that are interior nodes in the tree. SplitStream \cite{castro1} solves this problem by redistributing the content among interior-node-disjoint
 multicast trees providing a uniform loading among the peers. Authors \cite{castro1} show that it is possible
 to construct an efficient SplitStream forest provided that participants of the multicast at least have equal
-inbound and outbound bandwidth. Furthermore, the SplitSream is resistant to failures, provided that the content
-is encoded, since peers lost on average one stripe due to nodes malfunction.
+inbound and outbound bandwidth. Furthermore, the SplitSream is resistant to failures, provided that the content is encoded, since peers lost on average one stripe due to nodes malfunction.
+In GNUnet a multicast service is still missing. Therefore the goal of our project is to implement a SplitStream based application multicast service. Castro et al. \cite{castro1} built SplitSream  on top of Pastry and Scribe. However, Scribe \cite{castro3} and Pastry \cite{Rowstron} are not available yet on GNUnet. Hence we are looking for an alternative way to implement SplitStream, without Scribe and Pastry, on GNUnet.
+
+
 \section{Problem importance}
-The application level multicast using only unicast translation is an alternative to multicast at the network layer
-which has to be supported by the network infrastructure. In cooperative networks users get access to a service in exchange
-to provided resources. Unfortunately, usage of multicast trees is not an option in cooperative networks, as majority of
-users are leaves and do not provide necessary resources for the transmission of messages. This problem is particularly
-evident in  a distribution of audio and video resources. SlipStream allows the distribution of such content, providing a
+In cooperative networks users get access to a service in exchange
+to provided resources. Unfortunately, usage of conventional multicast trees are not an option in cooperative networks, as majority of
+peers are leaves and do not provide necessary resources for the transmission of multicast traffic. This problem is particularly
+evident in distribution of audio and video resources. SlipStream allows the distribution of such content, providing a
 uniform load on the network participants.
 \paragraph{}
 The main idea behind the SplitStream is to divide the content on k stipes and to distribute them among the trees which forms
@@ -39,18 +37,21 @@ hide information loss in the system.
 \paragraph{}
 The main problem in design of  SplitStream is efficient construction of distribution trees forest that satisfy bandwidth
 constraints in decentralized, scalable and efficient manner.
+
 \section{Related work}
 So far we have found several articles related to the topic. Castro et al.\cite{castro1}, \cite{castro2} describe the 
 SplitStream design and give a theoretical justification for the effiecient forest construction. They also implemented
 the SplitStream and tested it in the Planetlab \cite{Planetlab}. Rowstron and Druschel\cite{Rowstron} describe Pastry
 ``a scalable, distributed object location and routing substrate for wide-area peer-to-peer applications'' \cite{Rowstron}.
 Castro et al. also present Scribe in their paper \cite{castro3}. Scribe is an application level anycast for highly dynamic
-groups. The SplitSream is built on top of the Scribe. We have also found java implementation of Pastry, Scribe and the
+groups.
+We have found java implementation of Pastry, Scribe and 
 SplitStream at FreePastry \cite{FreePastry} which could a good starting point of our C implementation.
+
 \section{Milestones}
 Our plan of the SplitSream implementaion:
 \begin{enumerate}
- \item Gnunet\cite{GNUnet} build. Studying of the API. (9th May)
+ \item GNUnet\cite{GNUnet} build. Studying of the API. (9th May)
  \item Studying of the article \cite{castro1}. Formalization of the SplitSream algorithms. (16th May)
  \item Studying java implementation of Pastry, Scribe and SplitSream \cite{FreePastry}. (23th May)
  \item Building interior-node-disjoint trees. (30th May)

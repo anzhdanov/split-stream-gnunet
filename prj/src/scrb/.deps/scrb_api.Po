@@ -1,5 +1,4 @@
-plugin_block_scrb.lo: plugin_block_scrb.c \
- /home/alexander/gnunet/include/gnunet/platform.h \
+scrb_api.o: scrb_api.c /home/alexander/gnunet/include/gnunet/platform.h \
  /home/alexander/gnunet/include/gnunet/gnunet_config.h \
  /usr/include/x86_64-linux-gnu/sys/types.h /usr/include/features.h \
  /usr/include/x86_64-linux-gnu/bits/predefs.h \
@@ -107,8 +106,6 @@ plugin_block_scrb.lo: plugin_block_scrb.c \
  /usr/include/x86_64-linux-gnu/sys/mman.h \
  /usr/include/x86_64-linux-gnu/bits/mman.h /usr/include/langinfo.h \
  /usr/include/nl_types.h \
- /home/alexander/gnunet/include/gnunet/gnunet_constants.h \
- /home/alexander/gnunet/include/gnunet/gnunet_hello_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_util_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_crypto_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_common.h \
@@ -130,15 +127,29 @@ plugin_block_scrb.lo: plugin_block_scrb.c \
  /home/alexander/gnunet/include/gnunet/gnunet_mq_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_os_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_peer_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_util_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_plugin_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_program_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_protocols.h \
  /home/alexander/gnunet/include/gnunet/gnunet_service_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_signal_lib.h \
  /home/alexander/gnunet/include/gnunet/gnunet_strings_lib.h \
- /home/alexander/gnunet/include/gnunet/gnunet_block_plugin.h \
- /home/alexander/gnunet/include/gnunet/gnunet_block_lib.h \
- /home/alexander/gnunet/include/gnunet/gnunet_block_lib.h
+ /home/alexander/gnunet/include/gnunet/gnunet_multicast_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_transport_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_ats_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_constants.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_hello_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_mq_lib.h handle.h \
+ ../../src/include/gnunet_scrb_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_arm_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_core_service.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_getopt_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_os_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_program_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_scheduler_lib.h \
+ /home/alexander/gnunet/include/gnunet/gnunet_transport_service.h scrb.h \
+ scrb_publisher.h scrb_subscriber.h scrb_multicast.h \
+ ../../src/include/gnunet_protocols_scrb.h
 
 /home/alexander/gnunet/include/gnunet/platform.h:
 
@@ -426,10 +437,6 @@ plugin_block_scrb.lo: plugin_block_scrb.c \
 
 /usr/include/nl_types.h:
 
-/home/alexander/gnunet/include/gnunet/gnunet_constants.h:
-
-/home/alexander/gnunet/include/gnunet/gnunet_hello_lib.h:
-
 /home/alexander/gnunet/include/gnunet/gnunet_util_lib.h:
 
 /home/alexander/gnunet/include/gnunet/gnunet_crypto_lib.h:
@@ -474,6 +481,8 @@ plugin_block_scrb.lo: plugin_block_scrb.c \
 
 /home/alexander/gnunet/include/gnunet/gnunet_peer_lib.h:
 
+/home/alexander/gnunet/include/gnunet/gnunet_util_lib.h:
+
 /home/alexander/gnunet/include/gnunet/gnunet_plugin_lib.h:
 
 /home/alexander/gnunet/include/gnunet/gnunet_program_lib.h:
@@ -486,8 +495,42 @@ plugin_block_scrb.lo: plugin_block_scrb.c \
 
 /home/alexander/gnunet/include/gnunet/gnunet_strings_lib.h:
 
-/home/alexander/gnunet/include/gnunet/gnunet_block_plugin.h:
+/home/alexander/gnunet/include/gnunet/gnunet_multicast_service.h:
 
-/home/alexander/gnunet/include/gnunet/gnunet_block_lib.h:
+/home/alexander/gnunet/include/gnunet/gnunet_transport_service.h:
 
-/home/alexander/gnunet/include/gnunet/gnunet_block_lib.h:
+/home/alexander/gnunet/include/gnunet/gnunet_ats_service.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_constants.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_hello_lib.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_mq_lib.h:
+
+handle.h:
+
+../../src/include/gnunet_scrb_service.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_arm_service.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_core_service.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_getopt_lib.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_os_lib.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_program_lib.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_scheduler_lib.h:
+
+/home/alexander/gnunet/include/gnunet/gnunet_transport_service.h:
+
+scrb.h:
+
+scrb_publisher.h:
+
+scrb_subscriber.h:
+
+scrb_multicast.h:
+
+../../src/include/gnunet_protocols_scrb.h:

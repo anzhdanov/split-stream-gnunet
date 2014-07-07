@@ -142,7 +142,7 @@
 #define PACKAGE_NAME "gnunet-scrb"
 
 /* source dir */
-#define PACKAGE_SOURCE_DIR "/home/alexander/workspace2/Grothoff/gnunet-scrb"
+#define PACKAGE_SOURCE_DIR "/home/alexander/workspace2/split-stream-gnunet-new/prj"
 
 /* Define to the full name and version of this package. */
 #define PACKAGE_STRING "gnunet-scrb 0.0.0"

@@ -23,6 +23,9 @@
  * @author Matthias Wachs
  */
 
+#ifndef SCRB_H
+#define SCRB_H
+
 #include "gnunet_scrb_service.h"
 #include <stdint.h>
 #include "scrb_publisher.h"
@@ -264,3 +267,4 @@ struct GNUNET_SCRB_SendLeaveToParent
 
 
 GNUNET_NETWORK_STRUCT_END
+#endif

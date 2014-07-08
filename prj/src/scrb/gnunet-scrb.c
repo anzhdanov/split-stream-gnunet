@@ -62,7 +62,7 @@ run (void *cls,
 	if(NULL == handle)
 		goto error;
 
-	GNUNET_SCRB_request_id(handle);
+	GNUNET_SCRB_request_id(handle, NULL, NULL);
 
 	if(source != 0){
 		publish(handle);

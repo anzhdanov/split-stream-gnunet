@@ -34,6 +34,7 @@
 #include "gnunet/gnunet_program_lib.h"
 #include "gnunet/gnunet_scheduler_lib.h"
 #include "gnunet/gnunet_transport_service.h"
+#include "../scrb/scrb.h"
 
 
 #ifdef __cplusplus
@@ -53,22 +54,24 @@ struct GNUNET_SCRB_Handle;
 
 struct PeerContext
 {
-  struct GNUNET_CONFIGURATION_Handle *cfg;
-  struct GNUNET_CORE_Handle *ch;
-  struct GNUNET_PeerIdentity id;
-  struct GNUNET_TRANSPORT_Handle *th;
-  struct GNUNET_TRANSPORT_GetHelloHandle *ghh;
-  struct GNUNET_MessageHeader *hello;
-  int connect_status;
-  struct GNUNET_OS_Process *arm_proc;
+	struct GNUNET_CONFIGURATION_Handle *cfg;
+	struct GNUNET_CORE_Handle *ch;
+	struct GNUNET_PeerIdentity id;
+	struct GNUNET_TRANSPORT_Handle *th;
+	struct GNUNET_TRANSPORT_GetHelloHandle *ghh;
+	struct GNUNET_MessageHeader *hello;
+	int connect_status;
+	struct GNUNET_OS_Process *arm_proc;
 };
 
 /**
  * the client sends a request to service to start a group
  */
-void GNUNET_SCRB_request_create(struct GNUNET_SCRB_Handle *eh, const struct GNUNET_HashCode* group_id);
-
-void GNUNET_SCRB_request_id(struct GNUNET_SCRB_Handle *eh);
+void GNUNET_SCRB_request_create(
+		struct GNUNET_SCRB_Handle *eh,
+		const struct GNUNET_HashCode* group_id,
+		void (*cb)(),
+		void* cb_cls);
 
 /**
  * connects a client to Scribe service
@@ -84,20 +87,36 @@ void
 GNUNET_SCRB_disconnect (struct GNUNET_SCRB_Handle *eh);
 
 void
-GNUNET_SCRB_request_id(struct GNUNET_SCRB_Handle *eh);
+GNUNET_SCRB_request_id(
+		struct GNUNET_SCRB_Handle *eh,
+		void (*cb)(),
+		void* cb_cls);
 
 void
-GNUNET_SCRB_subscribe(struct GNUNET_SCRB_Handle *eh,
-		const struct GNUNET_HashCode* group_id, const struct GNUNET_HashCode* cid);
+GNUNET_SCRB_subscribe(
+		struct GNUNET_SCRB_Handle *eh,
+		const struct GNUNET_HashCode* group_id,
+		const struct GNUNET_HashCode* cid,
+		void (*cb)(),
+		void* cb_cls);
 
 void
-GNUNET_SCRB_request_multicast(struct GNUNET_SCRB_Handle *eh, const struct GNUNET_HashCode* group_id);
+GNUNET_SCRB_request_multicast(
+		struct GNUNET_SCRB_Handle *eh,
+		const struct GNUNET_HashCode* group_id,
+		const struct GNUNET_SCRB_UpdateSubscriber *msg,
+		void (*cb)(),
+		void* cb_cls);
 
 void
 GNUNET_SCRB_request_service_list(struct GNUNET_SCRB_Handle *eh);
 
 void
-GNUNET_SCRB_request_leave(struct GNUNET_SCRB_Handle *eh, const struct GNUNET_HashCode* group_id);
+GNUNET_SCRB_request_leave(
+		struct GNUNET_SCRB_Handle *eh,
+		const struct GNUNET_HashCode* group_id,
+		void (*cb)(),
+		void* cb_cls);
 
 void multicast(struct GNUNET_SCRB_Handle* eh);
 

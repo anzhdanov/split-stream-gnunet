@@ -1,10 +1,12 @@
 #include <unistd.h>
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>
+#include <gnunet/gnunet_testbed_service.h>
 #include "handle.h"
 #include "../include/gnunet_scrb_service.h"
 #include "gnunet/gnunet_crypto_lib.h"
 #include "gnunet/gnunet_common.h"
+#include "gnunet/gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
 #define NUM_PEERS 3
 
@@ -95,7 +97,7 @@ join_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 	struct GNUNET_SCRB_Handle *scrb_handle = cls;
 	if(publisher_init == 1)
-		GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid);
+		GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid, NULL, NULL);
 	else
 		GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
 				&join_task, scrb_handle);
@@ -105,7 +107,14 @@ static void
 multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 	struct GNUNET_SCRB_Handle *scrb_handle = cls;
-	GNUNET_SCRB_request_multicast(scrb_handle, &publisher);
+	struct GNUNET_SCRB_UpdateSubscriber msg;
+
+	size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
+
+	msg.header.size = htons((uint16_t) msg_size);
+	msg.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+
+	GNUNET_SCRB_request_multicast(scrb_handle, &publisher, &msg, NULL, NULL);
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
 			&multicast_task, scrb_handle);
 }
@@ -113,7 +122,7 @@ multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 void continuation_leave_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 {
 	//leave the the group
-	GNUNET_SCRB_request_leave(scrb_handle, scrb_handle->cid);
+	GNUNET_SCRB_request_leave(scrb_handle, scrb_handle->cid, NULL, NULL);
 }
 
 void continuation_multicast_cb(struct GNUNET_SCRB_Handle* scrb_handle)
@@ -130,12 +139,9 @@ void continuation_join_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 
 void continuation_create_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 {
-	struct SCRBPeer* peer = scrb_handle->cb_cls;
 	publisher = *scrb_handle->cid;
 	publisher_init = 1;
-	//we add here a pointer to join callback
-	scrb_handle->cb = &continuation_multicast_cb;
-	GNUNET_SCRB_request_create(scrb_handle, scrb_handle->cid);
+	GNUNET_SCRB_request_create(scrb_handle, scrb_handle->cid, &continuation_multicast_cb, NULL);
 }
 
 /**
@@ -162,13 +168,11 @@ service_connect_pub (void *cls,
 	GNUNET_log(GNUNET_ERROR_TYPE_DEBUG,
 			"Connecting to peer %s \n",
 			GNUNET_i2s (scrb_handle->cid));
-	scrb_handle->cb_cls = peer;
-	GNUNET_SCRB_request_id(scrb_handle);
 
 	if(peer->id == 0)
-		scrb_handle->cb = &continuation_create_cb;
+		GNUNET_SCRB_request_id(scrb_handle, &continuation_create_cb, peer);
 	else
-		scrb_handle->cb = &continuation_join_cb;
+		GNUNET_SCRB_request_id(scrb_handle, &continuation_join_cb, peer);
 
 	//	GNUNET_SCRB_request_create(ext_handle, peer->id);
 
@@ -181,34 +185,6 @@ service_connect_pub (void *cls,
 	//			(GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
 	//					&shutdown_task, NULL);
 }
-
-static void
-service_connect_sub (void *cls,
-		struct GNUNET_TESTBED_Operation *op,
-		void *ca_result,
-		const char *emsg)
-{
-	struct SCRBPeer* peer = cls;
-	scrb_handle = ca_result;
-	/* Service to DHT successful; here we'd usually do something
-     with the DHT (ok, if successful) */
-	scrb_handle->cb = &continuation_join_cb;
-	scrb_handle->cb_cls = peer;
-	GNUNET_SCRB_request_id(scrb_handle);
-
-	//	GNUNET_SCRB_request_create(ext_handle, peer->id);
-
-	//	GNUNET_SCRB_subscribe(ext_handle, peer->id);
-
-	//	GNUNET_SCRB_request_multicast(ext_handle);
-	/* for now, just indiscriminately terminate after 10s */
-	//	GNUNET_SCHEDULER_cancel (shutdown_tid);
-	//	shutdown_tid = GNUNET_SCHEDULER_add_delayed
-	//			(GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-	//					&shutdown_task, NULL);
-}
-
-
 
 /**
  * Testbed has provided us with the configuration to access one
@@ -307,7 +283,7 @@ main (int argc, char **argv)
 
 	result = GNUNET_SYSERR;
 	ret = GNUNET_TESTBED_test_run
-			("awesome-test",  /* test case name */
+			("scrb-test",  /* test case name */
 					"~/peer1.conf", /* template configuration */
 					NUM_PEERS,       /* number of peers to start */
 					0LL, /* Event mask - set to 0 for no event notifications */

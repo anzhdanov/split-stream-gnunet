@@ -104,7 +104,7 @@ void
 GNUNET_SCRB_request_multicast(
 		struct GNUNET_SCRB_Handle *eh,
 		const struct GNUNET_HashCode* group_id,
-		const struct GNUNET_SCRB_UpdateSubscriber *msg,
+		const struct GNUNET_SCRB_MulticastData* data,
 		void (*cb)(),
 		void* cb_cls);
 

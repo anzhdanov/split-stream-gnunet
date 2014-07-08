@@ -115,7 +115,7 @@ receive_create_reply (void *cls, const struct GNUNET_MessageHeader *msg)
 	/**
 	 * ...
 	 */
-	//	multicast(eh);
+	multicast(eh);
 }
 
 /**
@@ -287,13 +287,21 @@ void GNUNET_SCRB_subscribe(
 void GNUNET_SCRB_request_multicast(
 		struct GNUNET_SCRB_Handle *eh,
 		const struct GNUNET_HashCode* group_id,
-		const struct GNUNET_SCRB_UpdateSubscriber *msg,
+		const struct GNUNET_SCRB_MulticastData* data,
 		void (*cb)(),
 		void* cb_cls)
 {
 	eh->cb = cb;
 	eh->cb_cls = cb_cls;
+	struct GNUNET_SCRB_UpdateSubscriber* msg;
 	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+
+	size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
+	msg->header.size = htons((uint16_t) msg_size);
+	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+	msg->group_id = *group_id;
+	memcpy(&msg->data, data, sizeof(struct GNUNET_SCRB_MulticastData));
+
 	GNUNET_MQ_send (eh->mq, ev);
 }
 
@@ -376,11 +384,7 @@ static void
 multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 	struct GNUNET_SCRB_Handle* eh = cls;
-	struct GNUNET_SCRB_UpdateSubscriber msg;
-
-	size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
-	msg.header.size = htons((uint16_t) msg_size);
-	msg.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+	struct GNUNET_SCRB_MulticastData msg;
 
 	GNUNET_SCRB_request_multicast(eh, &my_identity_hash, &msg, NULL, NULL);
 

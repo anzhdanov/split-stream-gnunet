@@ -8,7 +8,7 @@
 #include "gnunet/gnunet_common.h"
 #include "gnunet/gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 3
+#define NUM_PEERS 5
 
 static struct GNUNET_HashCode publisher;
 
@@ -107,12 +107,7 @@ static void
 multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 	struct GNUNET_SCRB_Handle *scrb_handle = cls;
-	struct GNUNET_SCRB_UpdateSubscriber msg;
-
-	size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
-
-	msg.header.size = htons((uint16_t) msg_size);
-	msg.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+	struct GNUNET_SCRB_MulticastData msg;
 
 	GNUNET_SCRB_request_multicast(scrb_handle, &publisher, &msg, NULL, NULL);
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),

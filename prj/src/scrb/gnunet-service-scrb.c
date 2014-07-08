@@ -221,6 +221,7 @@ void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 			const void *data,
 			size_t size)
 	{
+          GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "DHT PUT received\n");
 		if (0 != (options & GNUNET_DHT_RO_LAST_HOP))
 			deliver(cls, type, path_length, path, key, data, size);
 		else
@@ -1354,7 +1355,7 @@ void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 	int
 	main (int argc, char *const *argv)
 	{
-		printf("I am running !");
+          fprintf(stderr, "I am running !");
 		return (GNUNET_OK ==
 				GNUNET_SERVICE_run (argc,
 						argv,

@@ -6,21 +6,13 @@
 #include "../include/gnunet_scrb_service.h"
 #include "gnunet/gnunet_crypto_lib.h"
 #include "gnunet/gnunet_common.h"
-#include "gnunet/gnunet_protocols_scrb.h"
+#include "gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 5
+#define NUM_PEERS 10
 
 static struct GNUNET_HashCode publisher;
 
 static int publisher_init = 0;
-
-//static struct GNUNET_TESTBED_Operation *dht_op;
-
-static struct GNUNET_TESTBED_Operation *scrb_op;
-
-//static struct GNUNET_DHT_Handle *dht_handle;
-
-static struct GNUNET_SCRB_Handle *scrb_handle;
 
 static GNUNET_SCHEDULER_TaskIdentifier shutdown_tid;
 
@@ -54,6 +46,8 @@ struct SCRBPeer
 	 */
 	struct GNUNET_TESTBED_Operation *scrb_op;
 
+  struct GNUNET_SCRB_Handle *scrb;
+
 	unsigned int id;
 
 };
@@ -80,14 +74,16 @@ static struct GNUNET_TESTBED_Peer **guardians;
 static void
 shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
+  struct SCRBPeer *peer;
+
 	shutdown_tid = GNUNET_SCHEDULER_NO_TASK;
-	if (NULL != scrb_op)
-	{
-		GNUNET_TESTBED_operation_done (scrb_op); /* indirectly calls the dht_da() for closing
-                                               down the connection to the DHT */
-		scrb_op = NULL;
-		scrb_handle = NULL;
-	}
+        
+        while (NULL != (peer = peer_head))
+        {
+          if (NULL != peer->scrb_op)
+            GNUNET_TESTBED_operation_done (peer->scrb_op);
+          peer->scrb_op = NULL;
+        }
 	result = GNUNET_OK;
 	GNUNET_SCHEDULER_shutdown (); /* Also kills the testbed */
 }
@@ -157,17 +153,17 @@ service_connect_pub (void *cls,
 		const char *emsg)
 {
 	struct SCRBPeer* peer = cls;
-	scrb_handle = ca_result;
+        peer->scrb = ca_result;
 	/* Service to DHT successful; here we'd usually do something
      with the DHT (ok, if successful) */
 	GNUNET_log(GNUNET_ERROR_TYPE_DEBUG,
 			"Connecting to peer %s \n",
-			GNUNET_i2s (scrb_handle->cid));
+			GNUNET_i2s (peer->scrb->cid));
 
 	if(peer->id == 0)
-		GNUNET_SCRB_request_id(scrb_handle, &continuation_create_cb, peer);
+		GNUNET_SCRB_request_id(peer->scrb, &continuation_create_cb, peer);
 	else
-		GNUNET_SCRB_request_id(scrb_handle, &continuation_join_cb, peer);
+		GNUNET_SCRB_request_id(peer->scrb, &continuation_join_cb, peer);
 
 	//	GNUNET_SCRB_request_create(ext_handle, peer->id);
 
@@ -199,8 +195,7 @@ static void *
 scrb_connect (void *cls, const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
 	/* Use the provided configuration to connect to service */
-	scrb_handle = GNUNET_SCRB_connect (cfg);
-	return scrb_handle;
+  return GNUNET_SCRB_connect (cfg);
 }
 
 
@@ -214,9 +209,10 @@ scrb_connect (void *cls, const struct GNUNET_CONFIGURATION_Handle *cfg)
 static void
 scrb_disconnect (void *cls, void *op_result)
 {
-	/* Disconnect from DHT service */
-	GNUNET_SCRB_disconnect ((struct GNUNET_SCRB_Handle *) op_result);
-	scrb_handle = NULL;
+  struct SCRBPeer *peer = cls;
+  /* Disconnect from SCRB service */
+  GNUNET_SCRB_disconnect ((struct GNUNET_SCRB_Handle *) op_result);
+  peer->scrb = NULL;
 }
 
 
@@ -252,18 +248,20 @@ test_master (void *cls,
 		current_peer = GNUNET_new(struct SCRBPeer);
 		current_peer->guardian = guardians[i];
 		current_peer->id = i;
-		current_peer->scrb_op = GNUNET_TESTBED_service_connect
-				(NULL,                    /* Closure for operation */
-						peers[i],                /* The peer whose service to connect to */
-						"scrb",                   /* The name of the service */
-						service_connect_pub,    /* callback to call after a handle to service
-                                   is opened */
-						current_peer,                    /* closure for the above callback */
-						scrb_connect,                  /* callback to call with peer's configuration;
-                                   this should open the needed service connection */
-						scrb_disconnect,                  /* callback to be called when closing the
-                                   opened service connection */
-						NULL);                  /* closure for the above two callbacks */
+		current_peer->scrb_op = 
+                    GNUNET_TESTBED_service_connect
+                    (NULL,      /* Closure for operation */
+                     peers[i],  /* The peer whose service to connect to */
+                     "scrb",    /* The name of the service */
+                     service_connect_pub, /* callback to call after a handle to
+                                                service is opened */
+                     current_peer, /* closure for the above callback */
+                     scrb_connect, /* callback to call with peer's
+                                      configuration; this should open the needed
+                                      service connection */
+                     scrb_disconnect, /* callback to be called when closing the
+                                         opened service connection */
+                     current_peer); /* closure for the above two callbacks */
 		GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
 	}
 	shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
@@ -279,7 +277,7 @@ main (int argc, char **argv)
 	result = GNUNET_SYSERR;
 	ret = GNUNET_TESTBED_test_run
 			("scrb-test",  /* test case name */
-					"~/peer1.conf", /* template configuration */
+					"test_scrb_peer1.conf", /* template configuration */
 					NUM_PEERS,       /* number of peers to start */
 					0LL, /* Event mask - set to 0 for no event notifications */
 					NULL, /* Controller event callback */

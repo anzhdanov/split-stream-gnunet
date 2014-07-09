@@ -138,6 +138,23 @@ service_confirm_creation
 
 void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 		struct GNUNET_CONTAINER_MultiHashMap* clients);
+
+void forward_join(
+		const struct GNUNET_HashCode* key,
+		const void* data,
+		const struct GNUNET_PeerIdentity* path,
+		unsigned int path_length,
+		const struct GNUNET_STATISTICS_Handle* scrb_stats,
+		const struct GNUNET_CONTAINER_MultiHashMap* groups);
+
+void deliver_join(
+		const struct GNUNET_PeerIdentity* path,
+		unsigned int path_length,
+		const struct GNUNET_PeerIdentity* my_identity,
+		const struct GNUNET_HashCode* key,
+		const void* data,
+		struct GNUNET_STATISTICS_Handle* scrb_stats,
+		const struct GNUNET_CONTAINER_MultiHashMap* groups);
 /****************************************************************************************/
 static unsigned int id_counter = 0;
 
@@ -423,7 +440,6 @@ void update_stats(
 void receive_multicast(const struct GNUNET_HashCode* key,
 		const struct GNUNET_HashCode* my_identity_hash,
 		const struct GNUNET_CONTAINER_MultiHashMap* groups,
-		const struct GNUNET_DHT_Handle* dht_handle,
 		const struct GNUNET_BLOCK_SCRB_Multicast* multicast_block,
 		const struct GNUNET_CONTAINER_MultiHashMap* subscribers,
 		const struct GNUNET_CONTAINER_MultiHashMap* clients) {
@@ -432,15 +448,19 @@ void receive_multicast(const struct GNUNET_HashCode* key,
 	if (NULL != group) {
 		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
 		while (NULL != gs) {
-			if (0 != memcmp(&gs->sidh, &my_identity_hash, sizeof(struct GNUNET_HashCode))) {
-				GNUNET_DHT_put(dht_handle, &gs->sidh, 1,
-						GNUNET_DHT_RO_RECORD_ROUTE
-						| GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE
-						| GNUNET_DHT_RO_LAST_HOP,
-						GNUNET_BLOCK_SCRB_TYPE_MULTICAST,
-						sizeof(multicast_block), &multicast_block,
-						GNUNET_TIME_UNIT_FOREVER_ABS,
-						GNUNET_TIME_UNIT_FOREVER_REL, NULL, NULL);
+			if (0	!= memcmp(&gs->sidh, &my_identity_hash,	sizeof(struct GNUNET_HashCode))) {
+
+				struct GNUNET_SCRB_UpdateSubscriber *msg;
+				size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
+				struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, 	GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+
+				msg->header.size = htons((uint16_t) msg_size);
+				msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+				msg->data = multicast_block->data;
+				msg->group_id = multicast_block->group_id;
+				msg->last = multicast_block->last;
+
+				GNUNET_MQ_send(gs->mq_l, ev);
 			}
 			gs = gs->next;
 		}
@@ -471,6 +491,42 @@ void receive_multicast(const struct GNUNET_HashCode* key,
 	}
 }
 
+void deliver_join(
+		const struct GNUNET_PeerIdentity* path,
+		unsigned int path_length,
+		const struct GNUNET_PeerIdentity* my_identity,
+		const struct GNUNET_HashCode* key,
+		const void* data,
+		struct GNUNET_STATISTICS_Handle* scrb_stats,
+		const struct GNUNET_CONTAINER_MultiHashMap* groups) {
+	const char* msg = "# deliver: JOIN messages received from: ";
+	update_stats(msg, &path[path_length - 1], &*my_identity, key, scrb_stats);
+	GNUNET_STATISTICS_update(scrb_stats,
+			gettext_noop("# deliver: overall JOIN messages received"), 1,
+			GNUNET_NO);
+	struct GNUNET_SCRB_Group* group = GNUNET_CONTAINER_multihashmap_get(groups,
+			key);
+	if (group != NULL) {
+		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
+		uint32_t found = 0;
+		while (NULL != gs) {
+			if (0
+					== memcmp(&gs->sid, &path[path_length - 1],
+							sizeof(struct GNUNET_PeerIdentity)))
+				found = 1;
+
+			gs = gs->next;
+		}
+		if (found == 0) {
+			struct GNUNET_SCRB_GroupSubscriber* group_subscriber =
+					createGroupSubscriber(key, data, path[path_length - 1],
+							groups);
+			service_send_parent(group_subscriber);
+			service_confirm_subscription(group_subscriber);
+		}
+	}
+}
+
 void
 deliver (void *cls,
 		enum GNUNET_BLOCK_Type type,
@@ -494,30 +550,9 @@ deliver (void *cls,
 	}
 	case GNUNET_BLOCK_SCRB_TYPE_JOIN:
 	{
-		const char* msg = "# deliver: JOIN messages received from: ";
-		update_stats(msg, &path[path_length - 1], &my_identity, key, scrb_stats);
-		GNUNET_STATISTICS_update (scrb_stats,
-				gettext_noop ("# deliver: overall JOIN messages received"),
-				1, GNUNET_NO);
-		struct GNUNET_SCRB_Group* group = GNUNET_CONTAINER_multihashmap_get(groups, key);
-		if (group != NULL)
-		{
-			struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
-			uint32_t found = 0;
-			while (NULL != gs)
-			{
-				if(0==memcmp(&gs->sid, &path[path_length - 1] , sizeof(struct GNUNET_PeerIdentity)))
-					found = 1;
-				gs = gs->next;
-			}
-			if(found == 0)
-			{
-				struct GNUNET_SCRB_GroupSubscriber* group_subscriber = createGroupSubscriber(key, data, path[path_length -1], groups);
-				service_send_parent(group_subscriber);
-				service_confirm_subscription(group_subscriber);
-			}
-		}
-
+		forward_join(key, data, path, path_length, scrb_stats, groups);
+		//		deliver_join(path, path_length, &my_identity, key, data, scrb_stats,
+		//				groups);
 		break;
 	}
 	case GNUNET_BLOCK_SCRB_TYPE_MULTICAST:
@@ -529,8 +564,7 @@ deliver (void *cls,
 				1, GNUNET_NO);
 		struct GNUNET_BLOCK_SCRB_Multicast* multicast_block;
 		multicast_block = (struct GNUNET_BLOCK_SCRB_Multicast*) data;
-		receive_multicast(key, &my_identity_hash, groups, dht_handle,
-				multicast_block, subscribers, clients);
+		receive_multicast(key, &my_identity_hash, groups, multicast_block, subscribers, clients);
 		break;
 	}
 	case GNUNET_BLOCK_SCRB_TYPE_LEAVE:
@@ -551,6 +585,45 @@ deliver (void *cls,
 	}
 }
 
+void forward_join(
+		const struct GNUNET_HashCode* key,
+		const void* data,
+		const struct GNUNET_PeerIdentity* path,
+		unsigned int path_length,
+		const struct GNUNET_STATISTICS_Handle* scrb_stats,
+		const struct GNUNET_CONTAINER_MultiHashMap* groups) {
+	const char* msg = "# forward: JOIN messages received from: ";
+	update_stats(msg, &path[path_length - 1], &my_identity, key, scrb_stats);
+	GNUNET_STATISTICS_update(scrb_stats,
+			gettext_noop("# forward: overall JOIN messages received"), 1,
+			GNUNET_NO);
+	if (!GNUNET_CONTAINER_multihashmap_contains(groups, key)) {
+		createGroup(key, data, groups);
+		struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key,
+				data, path[path_length - 1], groups);
+		service_send_parent(gs);
+	} else //we check if already have the subscriber
+	{
+		struct GNUNET_SCRB_Group* group = GNUNET_CONTAINER_multihashmap_get(
+				groups, key);
+		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
+		uint32_t found = 0;
+		while (NULL != gs) {
+			if (0
+					== memcmp(&gs->sid, &path[path_length - 1],
+							sizeof(struct GNUNET_PeerIdentity)))
+				found = 1;
+
+			gs = gs->next;
+		}
+		if (found == 0) {
+			struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key,
+					data, path[path_length - 1], groups);
+			service_send_parent(gs);
+		}
+	}
+}
+
 void
 forward (void *cls,
 		enum GNUNET_BLOCK_Type type,
@@ -563,33 +636,7 @@ forward (void *cls,
 	switch (type) {
 	case GNUNET_BLOCK_SCRB_TYPE_JOIN:
 	{
-		GNUNET_STATISTICS_update (scrb_stats,
-				gettext_noop ("# forward: JOIN messages received"),
-				1, GNUNET_NO);
-		if(!GNUNET_CONTAINER_multihashmap_contains(groups, key))
-		{
-			createGroup(key, data, groups);
-			struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key, data, path[path_length - 1], groups);
-			service_send_parent(gs);
-
-		}else //we check if already have the subscriber
-		{
-			struct GNUNET_SCRB_Group* group = GNUNET_CONTAINER_multihashmap_get(groups, key);
-			struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
-			uint32_t found = 0;
-			while (NULL != gs)
-			{
-				if(0==memcmp(&gs->sid, &path[path_length - 1] , sizeof(struct GNUNET_PeerIdentity)))
-					found = 1;
-				gs = gs->next;
-			}
-			if(found == 0)
-			{
-				struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key, data, path[path_length - 1], groups);
-				service_send_parent(gs);
-			}
-		}
-
+		forward_join(key, data, path, path_length, scrb_stats, groups);
 		break;
 	}
 	case GNUNET_BLOCK_SCRB_TYPE_LEAVE:
@@ -713,6 +760,32 @@ static int handle_service_confirm_subscription (
 	return GNUNET_OK;
 }
 
+static int handle_service_multicast (
+		void *cls,
+		const struct GNUNET_PeerIdentity *other,
+		const struct GNUNET_MessageHeader *message)
+{
+	struct GNUNET_SCRB_UpdateSubscriber *hdr;
+	hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
+
+	const char* msg = "# deliver: MULTICAST messages received from: ";
+	update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
+	GNUNET_STATISTICS_update (scrb_stats,
+			gettext_noop ("# deliver: overall MULTICAST messages received"),
+			1, GNUNET_NO);
+
+	struct GNUNET_BLOCK_SCRB_Multicast mb;
+
+	mb.data = hdr->data;
+	mb.group_id = hdr->group_id;
+	mb.last = hdr->last;
+
+	receive_multicast(&hdr->group_id, &my_identity_hash, groups, &mb, subscribers, clients);
+
+	return GNUNET_OK;
+}
+
+
 static int
 handle_service_send_parent (void *cls,
 		const struct GNUNET_PeerIdentity *other,
@@ -766,6 +839,7 @@ p2p_init ()
 			{&handle_service_confirm_leave, GNUNET_MESSAGE_TYPE_SCRB_LEAVE_REPLY, 0},
 			{&handle_service_send_parent, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT, 0},
 			{&handle_service_send_leave_to_parent, GNUNET_MESSAGE_TYPE_SCRB_SEND_LEAVE_TO_PARENT, 0},
+			{&handle_service_multicast, GNUNET_MESSAGE_TYPE_SCRB_MULTICAST, 0},
 			{NULL, 0, 0}
 	};
 

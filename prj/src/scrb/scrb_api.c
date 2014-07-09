@@ -115,7 +115,7 @@ receive_create_reply (void *cls, const struct GNUNET_MessageHeader *msg)
 	/**
 	 * ...
 	 */
-	multicast(eh);
+//	multicast(eh);
 }
 
 /**

@@ -8,7 +8,7 @@
 #include "gnunet/gnunet_common.h"
 #include "gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 10
+#define NUM_PEERS 7
 
 static struct GNUNET_HashCode publisher;
 
@@ -162,7 +162,7 @@ service_connect_pub (void *cls,
 
 	if(peer->id == 0)
 		GNUNET_SCRB_request_id(peer->scrb, &continuation_create_cb, peer);
-	else
+	else if(peer->id == NUM_PEERS - 1)
 		GNUNET_SCRB_request_id(peer->scrb, &continuation_join_cb, peer);
 
 	//	GNUNET_SCRB_request_create(ext_handle, peer->id);
@@ -277,7 +277,7 @@ main (int argc, char **argv)
 	result = GNUNET_SYSERR;
 	ret = GNUNET_TESTBED_test_run
 			("scrb-test",  /* test case name */
-					"test_scrb_peer1.conf", /* template configuration */
+					"~/peer1.conf", /* template configuration */
 					NUM_PEERS,       /* number of peers to start */
 					0LL, /* Event mask - set to 0 for no event notifications */
 					NULL, /* Controller event callback */

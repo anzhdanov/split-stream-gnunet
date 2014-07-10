@@ -276,6 +276,7 @@ service_send_parent
 	my_msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT);
 	my_msg->parent = my_identity;
 	my_msg->group_id = group_subscriber->group_id;
+	my_msg->cid = group_subscriber->cid;
 
 	GNUNET_MQ_send (group_subscriber->mq_l, ev);
 	return GNUNET_OK;
@@ -295,6 +296,25 @@ service_send_leave_to_parent
 	my_msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SEND_LEAVE_TO_PARENT);
 	my_msg->group_id = parent->group_id;
 	my_msg->sid = my_identity_hash;
+
+	GNUNET_MQ_send (parent->mq, ev);
+	return GNUNET_OK;
+}
+
+size_t
+service_send_multicast_to_parent
+(const struct GNUNET_SCRB_GroupParent* parent, const struct GNUNET_SCRB_UpdateSubscriber* cl_msg)
+{
+	struct GNUNET_SCRB_UpdateSubscriber* my_msg;
+	size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
+
+	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(my_msg, GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+
+	my_msg->header.size = htons((uint16_t) msg_size);
+	my_msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
+	my_msg->group_id = cl_msg->group_id;
+	my_msg->data = cl_msg->data;
+	my_msg->last = cl_msg->last;
 
 	GNUNET_MQ_send (parent->mq, ev);
 	return GNUNET_OK;
@@ -438,7 +458,8 @@ void update_stats(
 }
 
 void receive_multicast(const struct GNUNET_HashCode* key,
-		const struct GNUNET_HashCode* my_identity_hash,
+		const struct GNUNET_PeerIdentity* my_identity,
+		const struct GNUNET_PeerIdentity* stop_peer,
 		const struct GNUNET_CONTAINER_MultiHashMap* groups,
 		const struct GNUNET_BLOCK_SCRB_Multicast* multicast_block,
 		const struct GNUNET_CONTAINER_MultiHashMap* subscribers,
@@ -448,7 +469,8 @@ void receive_multicast(const struct GNUNET_HashCode* key,
 	if (NULL != group) {
 		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
 		while (NULL != gs) {
-			if (0	!= memcmp(&gs->sidh, &my_identity_hash,	sizeof(struct GNUNET_HashCode))) {
+			if ((0	!= memcmp(&gs->sid, &my_identity,	sizeof(struct GNUNET_PeerIdentity))) &&
+					(0	!= memcmp(&gs->sid, &stop_peer,	sizeof(struct GNUNET_PeerIdentity)))) {
 
 				struct GNUNET_SCRB_UpdateSubscriber *msg;
 				size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
@@ -510,11 +532,8 @@ void deliver_join(
 		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
 		uint32_t found = 0;
 		while (NULL != gs) {
-			if (0
-					== memcmp(&gs->sid, &path[path_length - 1],
-							sizeof(struct GNUNET_PeerIdentity)))
+			if (0 == memcmp(&gs->sid, &path[path_length - 1], sizeof(struct GNUNET_PeerIdentity)))
 				found = 1;
-
 			gs = gs->next;
 		}
 		if (found == 0) {
@@ -522,7 +541,7 @@ void deliver_join(
 					createGroupSubscriber(key, data, path[path_length - 1],
 							groups);
 			service_send_parent(group_subscriber);
-			service_confirm_subscription(group_subscriber);
+			//			service_confirm_subscription(group_subscriber);
 		}
 	}
 }
@@ -564,7 +583,7 @@ deliver (void *cls,
 				1, GNUNET_NO);
 		struct GNUNET_BLOCK_SCRB_Multicast* multicast_block;
 		multicast_block = (struct GNUNET_BLOCK_SCRB_Multicast*) data;
-		receive_multicast(key, &my_identity_hash, groups, multicast_block, subscribers, clients);
+		receive_multicast(key, &my_identity, NULL, groups, multicast_block, subscribers, clients);
 		break;
 	}
 	case GNUNET_BLOCK_SCRB_TYPE_LEAVE:
@@ -737,8 +756,8 @@ static int handle_service_confirm_subscription (
 		const struct GNUNET_PeerIdentity *other,
 		const struct GNUNET_MessageHeader *message)
 {
-	struct GNUNET_SCRB_ServiceReplySubscribe *hdr;
-	hdr = (struct GNUNET_SCRB_ServiceReplySubscribe *) message;
+	struct GNUNET_SCRB_SendParent2Child *hdr;
+	hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
 
 	struct GNUNET_SCRB_ServiceSubscription* subs = GNUNET_new (struct GNUNET_SCRB_ServiceSubscription);
 
@@ -768,10 +787,10 @@ static int handle_service_multicast (
 	struct GNUNET_SCRB_UpdateSubscriber *hdr;
 	hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
 
-	const char* msg = "# deliver: MULTICAST messages received from: ";
+	const char* msg = "# handle: MULTICAST messages received from: ";
 	update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
 	GNUNET_STATISTICS_update (scrb_stats,
-			gettext_noop ("# deliver: overall MULTICAST messages received"),
+			gettext_noop ("# handle: overall MULTICAST messages received"),
 			1, GNUNET_NO);
 
 	struct GNUNET_BLOCK_SCRB_Multicast mb;
@@ -780,7 +799,11 @@ static int handle_service_multicast (
 	mb.group_id = hdr->group_id;
 	mb.last = hdr->last;
 
-	receive_multicast(&hdr->group_id, &my_identity_hash, groups, &mb, subscribers, clients);
+//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
+//
+//	service_send_multicast_to_parent(parent, hdr);
+
+	receive_multicast(&hdr->group_id, &my_identity, other, groups, &mb, subscribers, clients);
 
 	return GNUNET_OK;
 }
@@ -794,6 +817,9 @@ handle_service_send_parent (void *cls,
 	struct GNUNET_SCRB_SendParent2Child *hdr;
 	hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
 
+	const char* msg = "# service: SEND PARENT messages received from: ";
+	update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
+
 	struct GNUNET_SCRB_GroupParent* parent = GNUNET_new(struct GNUNET_SCRB_GroupParent);
 
 	parent->group_id = hdr->group_id;
@@ -806,6 +832,8 @@ handle_service_send_parent (void *cls,
 			&parent->group_id,
 			parent,
 			GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY );
+
+	handle_service_confirm_subscription(cls, other, message);
 
 	return GNUNET_OK;
 }
@@ -874,7 +902,12 @@ handle_cl_multicast_request (void *cls,
 	multicast_block.group_id = hdr->group_id;
 	multicast_block.last = hdr->last;
 
-	/* fixme: do not ignore return handles */
+	//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
+	//
+	//	service_send_multicast_to_parent(parent, hdr);
+	//
+	//	receive_multicast(&hdr->group_id, &my_identity_hash, NULL, groups, &multicast_block, subscribers, clients);
+
 	put_dht_handle = GNUNET_DHT_put (dht_handle, &hdr->group_id, 1,
 			GNUNET_DHT_RO_RECORD_ROUTE |
 			GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,

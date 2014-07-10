@@ -250,6 +250,8 @@ struct GNUNET_SCRB_SendParent2Child
 	 * client id
 	 */
 	struct GNUNET_PeerIdentity parent;
+
+	struct GNUNET_HashCode cid;
 };
 
 struct GNUNET_SCRB_SendLeaveToParent

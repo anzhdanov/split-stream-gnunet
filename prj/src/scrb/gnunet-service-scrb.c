@@ -205,22 +205,6 @@ struct GNUNET_MQ_Handle* mq;
 
 /****************************************************************************************/
 void
-get_dht_callback (void *cls,
-		enum GNUNET_DHT_RouteOption options,
-		enum GNUNET_BLOCK_Type type,
-		uint32_t hop_count,
-		uint32_t desired_replication_level,
-		unsigned int path_length,
-		const struct GNUNET_PeerIdentity *path,
-		const struct GNUNET_HashCode *key)
-{
-	struct GNUNET_BLOCK_SCRB_Join join_block;
-
-	join_block.cid = *key;
-	join_block.sid = path[0];
-	forward_join(key, &join_block, path, path_length, scrb_stats, groups);
-}
-void
 get_dht_resp_callback (void *cls,
 		enum GNUNET_BLOCK_Type type,
 		const struct GNUNET_PeerIdentity *get_path,
@@ -1147,6 +1131,7 @@ handle_cl_id_request (void *cls,
 
 	struct ClientEntry* ce = GNUNET_new(struct ClientEntry);
 	ce->cid = client_hash;
+        GNUNET_SERVER_client_keep (client);
 	ce->client = client;
 	ce->mq = GNUNET_MQ_queue_for_server_client(client);
 
@@ -1180,7 +1165,7 @@ free_client_entry (struct ClientEntry *ce)
 {
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 			"Cleaning up client entry\n");
-
+        GNUNET_SERVER_client_drop(ce->client);
 	GNUNET_CONTAINER_DLL_remove (cl_head, cl_tail, ce);
 
 	GNUNET_free (ce);
@@ -1427,6 +1412,7 @@ handle_client_disconnect (void *cls,
 			break;
 		current = current->next;
 	}
+        free_client_entry (current);
 	GNUNET_CONTAINER_multihashmap_remove(clients, current->cid, current);
 }
 
@@ -1482,7 +1468,7 @@ run (void *cls,
 	monitor_handle = GNUNET_DHT_monitor_start (dht_handle,
 			GNUNET_BLOCK_TYPE_ANY,
 			NULL,
-			&get_dht_callback,
+                                                   NULL,
 			&get_dht_resp_callback,
 			&put_dht_callback,
 			cls);

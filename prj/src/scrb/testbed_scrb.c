@@ -278,7 +278,7 @@ test_master (void *cls,
 						current_peer); /* closure for the above two callbacks */
 		GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
 	}
-	shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
+	shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_HOURS,
 			&shutdown_task, NULL);
 }
 

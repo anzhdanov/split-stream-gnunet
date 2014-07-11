@@ -291,7 +291,7 @@ main (int argc, char **argv)
 	result = GNUNET_SYSERR;
 	ret = GNUNET_TESTBED_test_run
 			("scrb-test",  /* test case name */
-					"~/peer1.conf", /* template configuration */
+					"test_scrb_peer1.conf", /* template configuration */
 					NUM_PEERS,       /* number of peers to start */
 					0LL, /* Event mask - set to 0 for no event notifications */
 					NULL, /* Controller event callback */

@@ -78,7 +78,7 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 
 	shutdown_tid = GNUNET_SCHEDULER_NO_TASK;
 
-	while (NULL != (peer = peer_head))
+        for (peer=peer_head; NULL != peer; peer=peer->next)
 	{
 		if (NULL != peer->scrb_op)
 			GNUNET_TESTBED_operation_done (peer->scrb_op);

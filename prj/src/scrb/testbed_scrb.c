@@ -78,7 +78,7 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 
 	shutdown_tid = GNUNET_SCHEDULER_NO_TASK;
 
-        for (peer=peer_head; NULL != peer; peer=peer->next)
+	for (peer=peer_head; NULL != peer; peer=peer->next)
 	{
 		if (NULL != peer->scrb_op)
 			GNUNET_TESTBED_operation_done (peer->scrb_op);
@@ -105,6 +105,7 @@ multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 	struct GNUNET_SCRB_Handle *scrb_handle = cls;
 	struct GNUNET_SCRB_MulticastData msg;
 
+	strncpy (msg.data, "Hello World!!", sizeof (msg.data));
 	GNUNET_SCRB_request_multicast(scrb_handle, &publisher, &msg, NULL, NULL);
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
 			&multicast_task, scrb_handle);

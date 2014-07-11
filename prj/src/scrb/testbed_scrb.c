@@ -8,7 +8,7 @@
 #include "gnunet/gnunet_common.h"
 #include "gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 50
+#define NUM_PEERS 10
 
 static struct GNUNET_HashCode publisher;
 

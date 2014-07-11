@@ -89,6 +89,11 @@ static struct GNUNET_DHT_Handle *dht_handle;
 static struct GNUNET_DHT_PutHandle *put_dht_handle;
 
 /**
+ * Handle to DHT GET
+ */
+static struct GNUNET_DHT_GetHandle *get_dht_handle;
+
+/**
  * How often do we run the PUTs?
  */
 #define PUT_FREQUENCY GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10)
@@ -209,7 +214,11 @@ get_dht_callback (void *cls,
 		const struct GNUNET_PeerIdentity *path,
 		const struct GNUNET_HashCode *key)
 {
-	printf("I got get event! \n");
+	struct GNUNET_BLOCK_SCRB_Join join_block;
+
+	join_block.cid = *key;
+	join_block.sid = path[0];
+	forward_join(key, &join_block, path, path_length, scrb_stats, groups);
 }
 void
 get_dht_resp_callback (void *cls,
@@ -381,7 +390,7 @@ struct GNUNET_SCRB_Group* createGroup(
 	group->sid = create_block->sid;
 	group->mq = GNUNET_CORE_mq_create (core_api, &create_block->sid);
 	GNUNET_CONTAINER_multihashmap_put(groups, &group->group_id, group,
-			GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE);
+			GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
 	return group;
 }
 
@@ -470,7 +479,9 @@ void receive_multicast(const struct GNUNET_HashCode* key,
 		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
 		while (NULL != gs) {
 			if ((0	!= memcmp(&gs->sid, &my_identity,	sizeof(struct GNUNET_PeerIdentity))) &&
-					(0	!= memcmp(&gs->sid, &stop_peer,	sizeof(struct GNUNET_PeerIdentity)))) {
+					(stop_peer == NULL || (0 != memcmp(&gs->sid, stop_peer,	sizeof(struct GNUNET_PeerIdentity))))) {
+				const char* msgu = "# receive MC: message is sent from: ";
+				update_stats(msgu, my_identity, &gs->sid, key, scrb_stats);
 
 				struct GNUNET_SCRB_UpdateSubscriber *msg;
 				size_t msg_size = sizeof(struct GNUNET_SCRB_UpdateSubscriber);
@@ -540,6 +551,8 @@ void deliver_join(
 			struct GNUNET_SCRB_GroupSubscriber* group_subscriber =
 					createGroupSubscriber(key, data, path[path_length - 1],
 							groups);
+			group_subscriber = createGroupSubscriber(key, data, path[path_length - 1],
+										groups);
 			service_send_parent(group_subscriber);
 			//			service_confirm_subscription(group_subscriber);
 		}
@@ -616,8 +629,14 @@ void forward_join(
 	GNUNET_STATISTICS_update(scrb_stats,
 			gettext_noop("# forward: overall JOIN messages received"), 1,
 			GNUNET_NO);
-	if (!GNUNET_CONTAINER_multihashmap_contains(groups, key)) {
-		createGroup(key, data, groups);
+	if (!GNUNET_CONTAINER_multihashmap_contains(groups, key))
+	{
+		struct GNUNET_BLOCK_SCRB_Create create_block;
+		struct GNUNET_BLOCK_SCRB_Join* join_block;
+		join_block = (struct GNUNET_BLOCK_SCRB_Join*) data;
+		create_block.cid = join_block->cid;
+		create_block.sid = join_block->sid;
+		createGroup(key, &create_block, groups);
 		struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key,
 				data, path[path_length - 1], groups);
 		service_send_parent(gs);
@@ -628,16 +647,13 @@ void forward_join(
 		struct GNUNET_SCRB_GroupSubscriber* gs = group->group_head;
 		uint32_t found = 0;
 		while (NULL != gs) {
-			if (0
-					== memcmp(&gs->sid, &path[path_length - 1],
-							sizeof(struct GNUNET_PeerIdentity)))
+			if (0 == memcmp(&gs->sid, &path[path_length - 1], sizeof(struct GNUNET_PeerIdentity)))
 				found = 1;
 
 			gs = gs->next;
 		}
 		if (found == 0) {
-			struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key,
-					data, path[path_length - 1], groups);
+			struct GNUNET_SCRB_GroupSubscriber* gs = createGroupSubscriber(key, data, path[path_length - 1], groups);
 			service_send_parent(gs);
 		}
 	}
@@ -799,9 +815,9 @@ static int handle_service_multicast (
 	mb.group_id = hdr->group_id;
 	mb.last = hdr->last;
 
-//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
-//
-//	service_send_multicast_to_parent(parent, hdr);
+	//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
+	//
+	//	service_send_multicast_to_parent(parent, hdr);
 
 	receive_multicast(&hdr->group_id, &my_identity, other, groups, &mb, subscribers, clients);
 
@@ -939,6 +955,21 @@ void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 }
 
 static void
+dht_get_join_handler (void *cls, struct GNUNET_TIME_Absolute expiration,
+		const struct GNUNET_HashCode *key,
+		const struct GNUNET_PeerIdentity *get_path,
+		unsigned int get_path_length,
+		const struct GNUNET_PeerIdentity *put_path,
+		unsigned int put_path_length,
+		enum GNUNET_BLOCK_Type type, size_t size, const void *data)
+{
+	/* Do stuff with the data and/or route */
+	/* Optionally: */
+	GNUNET_DHT_get_stop (get_dht_handle);
+}
+
+
+static void
 handle_cl_subscribe_request (void *cls,
 		struct GNUNET_SERVER_Client *client,
 		const struct GNUNET_MessageHeader *message)
@@ -957,6 +988,7 @@ handle_cl_subscribe_request (void *cls,
 		join_block.sid = my_identity;
 
 		/* fixme: do not ignore return handles */
+
 		put_dht_handle = GNUNET_DHT_put (dht_handle, &hdr->group_id, 1,
 				GNUNET_DHT_RO_RECORD_ROUTE |
 				GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
@@ -968,6 +1000,17 @@ handle_cl_subscribe_request (void *cls,
 
 		if(NULL == put_dht_handle)
 			GNUNET_break(0);
+		/* code with get handle
+		get_dht_handle = GNUNET_DHT_get_start (dht_handle,
+		GNUNET_BLOCK_SCRB_TYPE_CREATE,
+		&hdr->group_id,
+		1,
+		GNUNET_DHT_RO_RECORD_ROUTE |
+		GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+		NULL,
+		0,
+		&dht_get_join_handler, NULL);
+		 */
 
 	}else
 	{
@@ -1375,6 +1418,8 @@ handle_client_disconnect (void *cls,
 		struct GNUNET_SERVER_Client
 		* client)
 {
+	if(NULL == client)
+		return;
 	struct ClientEntry* current = cl_head;
 	while(current != NULL)
 	{
@@ -1382,7 +1427,6 @@ handle_client_disconnect (void *cls,
 			break;
 		current = current->next;
 	}
-
 	GNUNET_CONTAINER_multihashmap_remove(clients, current->cid, current);
 }
 

@@ -8,13 +8,17 @@
 #include "gnunet/gnunet_common.h"
 #include "gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 10
+#define NUM_PEERS 7
 
 static struct GNUNET_HashCode publisher;
 
 static int publisher_init = 0;
 
 static GNUNET_SCHEDULER_TaskIdentifier shutdown_tid;
+
+static GNUNET_SCHEDULER_TaskIdentifier join_tid;
+
+static GNUNET_SCHEDULER_TaskIdentifier multicast_tid;
 
 /**
  * Global result for testcase.
@@ -77,6 +81,8 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 	struct SCRBPeer *peer;
 
 	shutdown_tid = GNUNET_SCHEDULER_NO_TASK;
+	join_tid = GNUNET_SCHEDULER_NO_TASK;
+	multicast_tid = GNUNET_SCHEDULER_NO_TASK;
 
 	for (peer=peer_head; NULL != peer; peer=peer->next)
 	{
@@ -292,7 +298,7 @@ main (int argc, char **argv)
 	result = GNUNET_SYSERR;
 	ret = GNUNET_TESTBED_test_run
 			("scrb-test",  /* test case name */
-					"test_scrb_peer1.conf", /* template configuration */
+					"~/peer1.conf", /* template configuration */
 					NUM_PEERS,       /* number of peers to start */
 					0LL, /* Event mask - set to 0 for no event notifications */
 					NULL, /* Controller event callback */

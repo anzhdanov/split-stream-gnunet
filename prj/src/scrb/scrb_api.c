@@ -71,7 +71,10 @@ static struct GNUNET_HashCode group_id;
 static void
 receive_publisher_update (void *cls, const struct GNUNET_MessageHeader *msg)
 {
+	struct GNUNET_SCRB_Handle* eh = cls;
 
+	struct GNUNET_SCRB_UpdateSubscriber* up = (struct GNUNET_SCRB_UpdateSubscriber*)msg;
+	fprintf(stderr, "%.1024s", up->data);
 }
 
 /**

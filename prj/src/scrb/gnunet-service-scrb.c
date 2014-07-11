@@ -491,8 +491,8 @@ void receive_multicast(const struct GNUNET_HashCode* key,
 
 			struct ClientEntry* ce = GNUNET_CONTAINER_multihashmap_get(clients,
 					&sub->cid);
-
-			GNUNET_MQ_send(ce->mq, ev);
+			if(NULL != ce)
+				GNUNET_MQ_send(ce->mq, ev);
 
 			sub = sub->next;
 		}
@@ -926,7 +926,8 @@ void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 	msg->group_id = sub->group_id;
 	struct ClientEntry* ce = GNUNET_CONTAINER_multihashmap_get(clients,
 			&sub->cid);
-	GNUNET_MQ_send(ce->mq, ev);
+	if(NULL != ce)
+		GNUNET_MQ_send(ce->mq, ev);
 }
 
 static void

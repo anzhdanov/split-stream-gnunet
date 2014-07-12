@@ -1159,7 +1159,7 @@ free_client_entry (struct ClientEntry *ce)
 			"Cleaning up client entry\n");
 	GNUNET_SERVER_client_drop(ce->client);
 	GNUNET_CONTAINER_DLL_remove (cl_head, cl_tail, ce);
-
+	GNUNET_free (ce->cid);
 	GNUNET_free (ce);
 }
 
@@ -1184,6 +1184,7 @@ free_group_entry (struct GNUNET_SCRB_Group *group)
 		GNUNET_free (gs);
 	}
 
+	GNUNET_MQ_destroy(group->mq);
 	GNUNET_free (group);
 }
 
@@ -1234,7 +1235,6 @@ cleanup_client (void *cls,
 		void *value)
 {
 	struct ClientEntry *ce = value;
-        
 	free_client_entry (ce);
 	return GNUNET_OK;
 }

@@ -1234,7 +1234,7 @@ cleanup_client (void *cls,
 		void *value)
 {
 	struct ClientEntry *ce = value;
-
+        
 	free_client_entry (ce);
 	return GNUNET_OK;
 }
@@ -1325,7 +1325,7 @@ shutdown_task (void *cls,
 				&cleanup_client,
 				NULL);
 		GNUNET_CONTAINER_multihashmap_destroy (clients);
-		groups = NULL;
+                clients = NULL;
 	}
 
 	if (NULL != groups)
@@ -1361,7 +1361,7 @@ shutdown_task (void *cls,
 				&cleanup_parent,
 				NULL);
 		GNUNET_CONTAINER_multihashmap_destroy (parents);
-		subscribers = NULL;
+		parents = NULL;
 	}
 
 	GNUNET_DHT_monitor_stop (monitor_handle);
@@ -1401,11 +1401,14 @@ handle_client_disconnect (void *cls,
 	while(current != NULL)
 	{
 		if(current->client == client)
-			break;
+                {
+                  GNUNET_CONTAINER_multihashmap_remove(clients, current->cid,
+                                                       current);
+                  free_client_entry (current);
+                  return;
+                }
 		current = current->next;
 	}
-	free_client_entry (current);
-	GNUNET_CONTAINER_multihashmap_remove(clients, current->cid, current);
 }
 
 

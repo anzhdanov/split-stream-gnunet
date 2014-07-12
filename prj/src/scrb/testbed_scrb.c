@@ -8,7 +8,7 @@
 #include "gnunet/gnunet_common.h"
 #include "gnunet_protocols_scrb.h"
 /* Number of peers we want to start */
-#define NUM_PEERS 7
+#define NUM_PEERS 5
 
 static struct GNUNET_HashCode publisher;
 
@@ -52,6 +52,8 @@ struct SCRBPeer
 
 	struct GNUNET_SCRB_Handle *scrb;
 
+  GNUNET_SCHEDULER_TaskIdentifier join_task;
+
 	unsigned int id;
 
 };
@@ -89,6 +91,11 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 		if (NULL != peer->scrb_op)
 			GNUNET_TESTBED_operation_done (peer->scrb_op);
 		peer->scrb_op = NULL;
+                if (GNUNET_SCHEDULER_NO_TASK != peer->join_task)
+                {
+                  GNUNET_SCHEDULER_cancel (peer->join_task);
+                  peer->join_task = GNUNET_SCHEDULER_NO_TASK;
+                }
 	}
 	result = GNUNET_OK;
 	GNUNET_SCHEDULER_shutdown (); /* Also kills the testbed */
@@ -97,12 +104,16 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 static void
 join_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
-	struct GNUNET_SCRB_Handle *scrb_handle = cls;
-	if(publisher_init == 1)
-		GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid, NULL, NULL);
+  struct SCRBPeer *peer = cls;
+  struct GNUNET_SCRB_Handle *scrb_handle = peer->scrb;
 
-	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-			&join_task, scrb_handle);
+  GNUNET_assert (GNUNET_SCHEDULER_NO_TASK != peer->join_task);
+  if(publisher_init == 1)
+    GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid, NULL, NULL);
+  
+  peer->join_task = 
+      GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
+                                    &join_task, peer);
 }
 
 static void
@@ -129,10 +140,12 @@ void continuation_multicast_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 			&multicast_task, scrb_handle);
 }
 
-void continuation_join_cb(struct GNUNET_SCRB_Handle* scrb_handle)
+void continuation_join_cb(void *cls, struct GNUNET_SCRB_Handle* scrb_handle)
 {
-	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-			&join_task, scrb_handle);
+  struct SCRBPeer *peer = cls;
+
+  peer->join_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
+			&join_task, peer);
 }
 
 

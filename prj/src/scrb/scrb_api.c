@@ -74,7 +74,7 @@ receive_publisher_update (void *cls, const struct GNUNET_MessageHeader *msg)
 	struct GNUNET_SCRB_Handle* eh = cls;
 
 	struct GNUNET_SCRB_UpdateSubscriber* up = (struct GNUNET_SCRB_UpdateSubscriber*)msg;
-	fprintf(stderr, "%.1024s", up->data);
+	fprintf(stderr, "%.1024s", up->data.data);
 }
 
 /**
@@ -134,7 +134,7 @@ receive_subscribe_reply (void *cls, const struct GNUNET_MessageHeader *msg)
 
 	if(NULL != eh->cb)
 	{
-		eh->cb(eh);
+          eh->cb(eh->cb_cls, eh);
 	}
 	/**
 	 * request leave after a few seconds
@@ -202,7 +202,7 @@ GNUNET_SCRB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
 
 void GNUNET_SCRB_request_id(
 		struct GNUNET_SCRB_Handle *eh,
-		void (*cb)(),
+		void (*cb)(void *cls, struct GNUNET_SCRB_Handle *scrb),
 		void *cb_cls)
 {
 	eh->cb = cb;

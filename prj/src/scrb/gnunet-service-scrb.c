@@ -1163,6 +1163,14 @@ free_client_entry (struct ClientEntry *ce)
 	GNUNET_free (ce);
 }
 
+static void
+free_group_sub_entry (struct GNUNET_SCRB_GroupSubscriber *gs)
+{
+	GNUNET_MQ_destroy(gs->mq_l);
+	GNUNET_MQ_destroy(gs->mq_o);
+	GNUNET_free (gs);
+}
+
 
 /**
  * Free resources occupied by a group entry.
@@ -1181,7 +1189,7 @@ free_group_entry (struct GNUNET_SCRB_Group *group)
 		GNUNET_CONTAINER_DLL_remove (group->group_head,
 				group->group_tail,
 				gs);
-		GNUNET_free (gs);
+		free_group_sub_entry (gs);
 	}
 
 	GNUNET_MQ_destroy(group->mq);
@@ -1197,12 +1205,6 @@ static void
 free_pub_entry (struct GNUNET_SCRB_ServicePublisher *pub)
 {
 	GNUNET_free (pub);
-}
-
-static void
-free_par_entry (struct GNUNET_HashCode* par)
-{
-	GNUNET_free (par);
 }
 
 static void
@@ -1292,7 +1294,6 @@ cleanup_subscriber (void *cls,
 		void *value)
 {
 	struct GNUNET_SCRB_ServiceSubscription *subs = value;
-
 	free_subs_entry (subs);
 	return GNUNET_OK;
 }
@@ -1302,9 +1303,9 @@ cleanup_parent (void *cls,
 		const struct GNUNET_HashCode *key,
 		void *value)
 {
-	struct GNUNET_HashCode *parent = value;
-
-	free_par_entry (parent);
+	struct GNUNET_SCRB_GroupParent *parent = value;
+	GNUNET_MQ_destroy(parent->mq);
+	GNUNET_free(parent);
 	return GNUNET_OK;
 }
 

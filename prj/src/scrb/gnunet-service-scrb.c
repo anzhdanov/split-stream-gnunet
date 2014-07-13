@@ -1289,7 +1289,7 @@ cleanup_publisher (void *cls,
  * @return #GNUNET_OK (continue to iterate)
  */
 static int
-cleanup_subscriber (void *cls,
+cleanup_subscription (void *cls,
 		const struct GNUNET_HashCode *key,
 		void *value)
 {
@@ -1350,7 +1350,7 @@ shutdown_task (void *cls,
 	if (NULL != subscribers)
 	{
 		GNUNET_CONTAINER_multihashmap_iterate (subscribers,
-				&cleanup_subscriber,
+				&cleanup_subscription,
 				NULL);
 		GNUNET_CONTAINER_multihashmap_destroy (subscribers);
 		subscribers = NULL;

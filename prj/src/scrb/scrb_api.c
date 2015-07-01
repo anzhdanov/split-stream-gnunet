@@ -19,9 +19,9 @@
  */
 
 /**
- * @file ext/ext_api.c
- * @brief API for ext
- * @author 
+ * @file scrb/scrb_api.c
+ * @brief API for scrb
+ * @author azhdanov
  */
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>
@@ -55,11 +55,6 @@ static struct GNUNET_PeerIdentity* rp;
 static int publish_status;
 
 /**
- * subscribe status
- */
-static int subscribe_status;
-
-/**
  * Services available from the service
  */
 static struct GNUNET_CONTAINER_MultiHashMap *services;
@@ -71,8 +66,6 @@ static struct GNUNET_HashCode group_id;
 static void
 receive_publisher_update (void *cls, const struct GNUNET_MessageHeader *msg)
 {
-	struct GNUNET_SCRB_Handle* eh = cls;
-
 	struct GNUNET_SCRB_UpdateSubscriber* up = (struct GNUNET_SCRB_UpdateSubscriber*)msg;
 	fprintf(stderr, "%.1024s", up->data.data);
 }

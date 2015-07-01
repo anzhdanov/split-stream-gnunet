@@ -148,18 +148,6 @@ void continuation_join_cb(void *cls, struct GNUNET_SCRB_Handle* scrb_handle)
 			&join_task, peer);
 }
 
-
-static void
-create_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
-{
-	struct GNUNET_SCRB_Handle *scrb_handle = cls;
-
-	GNUNET_SCRB_request_create(scrb_handle, scrb_handle->cid, &continuation_multicast_cb, NULL);
-
-	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 20),
-			&create_task, scrb_handle);
-}
-
 void continuation_create_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 {
 	publisher = *scrb_handle->cid;

@@ -140,8 +140,8 @@ void forward_join(
 		const void* data,
 		const struct GNUNET_PeerIdentity* path,
 		unsigned int path_length,
-		const struct GNUNET_STATISTICS_Handle* scrb_stats,
-		const struct GNUNET_CONTAINER_MultiHashMap* groups);
+		struct GNUNET_STATISTICS_Handle* scrb_stats,
+		struct GNUNET_CONTAINER_MultiHashMap* groups);
 
 void deliver_join(
 		const struct GNUNET_PeerIdentity* path,
@@ -150,7 +150,7 @@ void deliver_join(
 		const struct GNUNET_HashCode* key,
 		const void* data,
 		struct GNUNET_STATISTICS_Handle* scrb_stats,
-		const struct GNUNET_CONTAINER_MultiHashMap* groups);
+		struct GNUNET_CONTAINER_MultiHashMap* groups);
 /****************************************************************************************/
 static unsigned int id_counter = 0;
 
@@ -430,7 +430,7 @@ void update_stats(
 		const struct GNUNET_PeerIdentity* src,
 		const struct GNUNET_PeerIdentity* my_identity,
 		const struct GNUNET_HashCode* group_id	,
-		const struct GNUNET_STATISTICS_Handle* scrb_stats) {
+		struct GNUNET_STATISTICS_Handle* scrb_stats) {
 	char str[100];
 	strcpy(str, msg);
 	strcat(str, GNUNET_i2s(src));
@@ -506,7 +506,7 @@ void deliver_join(
 		const struct GNUNET_HashCode* key,
 		const void* data,
 		struct GNUNET_STATISTICS_Handle* scrb_stats,
-		const struct GNUNET_CONTAINER_MultiHashMap* groups) {
+		struct GNUNET_CONTAINER_MultiHashMap* groups) {
 	const char* msg = "# deliver: JOIN messages received from: ";
 	update_stats(msg, &path[path_length - 1], &*my_identity, key, scrb_stats);
 	GNUNET_STATISTICS_update(scrb_stats,
@@ -597,8 +597,8 @@ void forward_join(
 		const void* data,
 		const struct GNUNET_PeerIdentity* path,
 		unsigned int path_length,
-		const struct GNUNET_STATISTICS_Handle* scrb_stats,
-		const struct GNUNET_CONTAINER_MultiHashMap* groups) {
+		struct GNUNET_STATISTICS_Handle* scrb_stats,
+		struct GNUNET_CONTAINER_MultiHashMap* groups) {
 	const char* msg = "# forward: JOIN messages received from: ";
 	update_stats(msg, &path[path_length - 1], &my_identity, key, scrb_stats);
 	GNUNET_STATISTICS_update(scrb_stats,
@@ -929,21 +929,6 @@ void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
 	if(NULL != ce)
 		GNUNET_MQ_send(ce->mq, ev);
 }
-
-static void
-dht_get_join_handler (void *cls, struct GNUNET_TIME_Absolute expiration,
-		const struct GNUNET_HashCode *key,
-		const struct GNUNET_PeerIdentity *get_path,
-		unsigned int get_path_length,
-		const struct GNUNET_PeerIdentity *put_path,
-		unsigned int put_path_length,
-		enum GNUNET_BLOCK_Type type, size_t size, const void *data)
-{
-	/* Do stuff with the data and/or route */
-	/* Optionally: */
-	GNUNET_DHT_get_stop (get_dht_handle);
-}
-
 
 static void
 handle_cl_subscribe_request (void *cls,

@@ -84,8 +84,8 @@ libgnunet_plugin_block_scrb_init (void *cls)
   struct GNUNET_BLOCK_PluginFunctions *api;
 
   api = GNUNET_new (struct GNUNET_BLOCK_PluginFunctions);
-  api->evaluate = &block_plugin_scrb_evaluate;
-  api->get_key = &block_plugin_scrb_get_key;
+  api->evaluate = block_plugin_scrb_evaluate;
+  api->get_key = block_plugin_scrb_get_key;
   api->types = types;
   return api;
 }

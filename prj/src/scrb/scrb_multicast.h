@@ -2,7 +2,7 @@
  * multicast.h
  *
  *  Created on: Jun 6, 2014
- *      Author: root
+ *      Author: azhdanov
  */
 
 #ifndef MULTICAST_H_

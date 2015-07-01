@@ -19,9 +19,9 @@
  */
 
 /**
- * @file include/gnunet_ext_service.h
- * @brief API to the ext service
- * @author Christian Grothoff
+ * @file include/gnunet_scrb_service.h
+ * @brief API to the scrb service
+ * @author azhdanov
  */
 #ifndef GNUNET_SCRB_SERVICE_H
 #define GNUNET_SCRB_SERVICE_H
@@ -35,7 +35,7 @@
 #include "gnunet/gnunet_scheduler_lib.h"
 #include "gnunet/gnunet_transport_service.h"
 #include "../scrb/scrb.h"
-
+#include "../scrb/scrb_multicast.h"
 
 #ifdef __cplusplus
 extern "C"

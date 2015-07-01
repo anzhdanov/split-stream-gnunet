@@ -14,11 +14,11 @@ static struct GNUNET_HashCode publisher;
 
 static int publisher_init = 0;
 
-static GNUNET_SCHEDULER_TaskIdentifier shutdown_tid;
+static struct GNUNET_SCHEDULER_Task *shutdown_tid;
 
-static GNUNET_SCHEDULER_TaskIdentifier join_tid;
+static struct GNUNET_SCHEDULER_Task *join_tid;
 
-static GNUNET_SCHEDULER_TaskIdentifier multicast_tid;
+static struct GNUNET_SCHEDULER_Task *multicast_tid;
 
 /**
  * Global result for testcase.
@@ -52,7 +52,7 @@ struct SCRBPeer
 
 	struct GNUNET_SCRB_Handle *scrb;
 
-  GNUNET_SCHEDULER_TaskIdentifier join_task;
+  struct GNUNET_SCHEDULER_Task * join_task;
 
 	unsigned int id;
 
@@ -82,19 +82,19 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 	struct SCRBPeer *peer;
 
-	shutdown_tid = GNUNET_SCHEDULER_NO_TASK;
-	join_tid = GNUNET_SCHEDULER_NO_TASK;
-	multicast_tid = GNUNET_SCHEDULER_NO_TASK;
+        shutdown_tid = NULL;
+        join_tid = NULL;
+        multicast_tid = NULL;
 
 	for (peer=peer_head; NULL != peer; peer=peer->next)
 	{
 		if (NULL != peer->scrb_op)
 			GNUNET_TESTBED_operation_done (peer->scrb_op);
 		peer->scrb_op = NULL;
-                if (GNUNET_SCHEDULER_NO_TASK != peer->join_task)
+                if (NULL != peer->join_task)
                 {
                   GNUNET_SCHEDULER_cancel (peer->join_task);
-                  peer->join_task = GNUNET_SCHEDULER_NO_TASK;
+                  peer->join_task = NULL;
                 }
 	}
 	result = GNUNET_OK;
@@ -107,7 +107,7 @@ join_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   struct SCRBPeer *peer = cls;
   struct GNUNET_SCRB_Handle *scrb_handle = peer->scrb;
 
-  GNUNET_assert (GNUNET_SCHEDULER_NO_TASK != peer->join_task);
+  GNUNET_assert (NULL != peer->join_task);
   if(publisher_init == 1)
     GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid, NULL, NULL);
   
@@ -192,7 +192,7 @@ service_connect_pub (void *cls,
      with the DHT (ok, if successful) */
 	GNUNET_log(GNUNET_ERROR_TYPE_DEBUG,
 			"Connecting to peer %s \n",
-			GNUNET_i2s (peer->scrb->cid));
+			GNUNET_h2s (peer->scrb->cid));
 
 	if(peer->id == 0)
 		GNUNET_SCRB_request_id(peer->scrb, &continuation_create_cb, peer);

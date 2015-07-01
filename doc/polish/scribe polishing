@@ -1,0 +1,91 @@
+Dear Alexander,
+ 
+I'm responding to you on the train from Rennes to Paris -- due to my
+move from Munich to France I have had no time before and I am still
+very busy, but you deserve a reply as I'm already feeling pretty bad
+for not responding for so long.
+ 
+As for your project, I understand that it unfortunately ended up as a
+one-man-show.  Looking at the code, I have a bunch of comments:
+ 
+0) you have a few compiler warnings, most of which you can get rid
+   off (except for the block enumeration)
+1) documentation is way insufficient; no man pages, no comments on
+   the functions in gnunet_scrb_service.h, etc.  So this makes it
+   a bit hard for me to assess what these should do.
+2) in scrb_api.c, there should not be any global (static) variables;
+   you should keep all the necessary state in GNUNET_SCRB_Handle;
+   the public functions not prefixed with GNUNET_SCRB should also
+   not even be there (they may belong on gnunet-scrb, or testcases,
+   or are dead code)
+3) in gnunet_scrb_service.h, the types for the callbacks are
+   all missing; you need to define those properly so that I can
+   even understand the API; also, GNUNET_SCRB_MulticastData needs
+   to be properly defined here, this cannot work as-is for code
+   outside of src/scrb/. Moreover, you currently use a fixed-size
+   buffer of 1024 bytes; this should be variable-size, so you
+   may indeed want to just pass a 'const void *' and a 'size_t'
+   instead.
+4) in your SCRB-service implementation, you make the (false)
+   assumption that you will only have one client and thus only
+   one get/put operation in flight at any given point in time;
+   a GNUnet service should be written as a server and you should
+   thus assume that you'll be joined (or joining, or operating)
+   many multicast groups at the same time.  So the way you
+   organize the data structures would need to change.
+5) the use of a HashCode for the 'client ID' is also ugly;
+   clients should be identified by their GNUNET_SERVER_Client
+   reference, and you should use the
+   GNUNET_SERVER_client_{set/get}_user_context macros to
+   associate your 'struct ClientEntry' with the client, avoiding
+   the need for the 'clients' hash map (and simplifying your
+   IPC protocol)
+6) the P2P protocol needs some means to detect cycles, and
+   eventually we should think about adding some security
+   (who's allowed to join/post, authentication, integrity
+   protection, etc.); maybe not all of these belong at this
+   level, but possibly some.
+7) you should use 'GNUNET_snprintf' instead of 'strcpy'/'strcat'
+   in update_stats, way faster & more secure
+8) your indentation is inconsistent and does not follow
+   GNUnet coding conventions; you often have file-scoped
+   functions that are not 'static' (but should be);
+   you should not use 'fprintf' to print debug statements
+   (possible exception: gnunet-scrb.c), use GNUNET_log.
+9) Instead of using a deterministic DHT, we should figure
+   out how to fix the SCRB protocol to work nicely with
+   non-deterministic DHTs; maybe a simple hop counter
+   would do.
+ 
+I do not know how soon your grade will be available at TUM online, I
+will, however, try to grade the entire course on my trip back to MUC
+and hopefully then be able to submit the grades to TUM.
+ 
+ 
+As for possible means for further cooperation to work on the project,
+I think that if you are able to clean up the scribe API, protocol and
+implementation (which will take some time and more iterations),
+expanding the project to cover splitstream and in particular
+considering how to integrate security features (and which ones) might
+be worthwhile for an MS-thesis topic.  One open question for me in
+this context is if we can make the splitstream API compatible with the
+'other' multicast API (gnunet_multicast_service.h), as that would
+enable us to do _comparissons_ of different designs. (A master's
+thesis should involve a bit of new research, so if Bart and TG
+implement the other multicast design, and you have the
+scribe/splitstream design, then we could do experiments to compare the
+two, which would be something new and interesting).
+ 
+One possible problem here is that I'm obviously no longer in MUC, and
+we do not yet know if Bart will be in MUC for more than 10 months.
+This _may_ be important with respect to you having a close mentor for
+your thesis, unless you are willing to do the thesis in Rennes
+(France), i.e. as part of the EU's Erasmus programme.  In any case, we
+expect to know more about where Bart will be for how long in early
+2015, so maybe you can plan to see how far you can get with polishing
+SCRB in the meantime, which would give us all a better handle on how
+promising a collaboration on this topic might be.
+ 
+Best regards,
+ 
+Christian

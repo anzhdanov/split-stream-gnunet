@@ -67,6 +67,16 @@ static struct GNUNET_HashCode my_identity_hash;
 struct GNUNET_STATISTICS_Handle *scrb_stats;
 
 /**
+ * Handle to our server.
+ */
+static struct GNUNET_SERVER_Handle *srv;
+
+/**
+ * Our notification context.
+ */
+static struct GNUNET_SERVER_NotificationContext *nc;
+
+/**
  * How many buckets will we allow total.
  */
 #define MAX_BUCKETS sizeof (struct GNUNET_HashCode) * 8
@@ -158,10 +168,6 @@ static struct GNUNET_CONTAINER_MultiHashMap *clients;
 
 struct ClientEntry
 {
-	/**
-	 * Message queue for the client
-	 */
-	struct GNUNET_MQ_Handle* mq;
 	/**
 	 * Client id
 	 */
@@ -884,13 +890,18 @@ handle_cl_multicast_request (void *cls,
 		struct GNUNET_SERVER_Client *client,
 		const struct GNUNET_MessageHeader *message)
 {
+
+	struct ClientEntry* ce;
+	if((ce = make_client_entry (client)) == NULL)
+		return;
+
 	struct GNUNET_SCRB_UpdateSubscriber *hdr;
 	hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
 
 	struct GNUNET_BLOCK_SCRB_Multicast multicast_block;
 
 	memcpy(&multicast_block.data, &hdr->data, sizeof(struct GNUNET_SCRB_MulticastData));
-	multicast_block.group_id = hdr->group_id;
+	multicast_block.group_id = ce->cid;
 	multicast_block.last = hdr->last;
 
 	//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
@@ -935,11 +946,12 @@ handle_cl_subscribe_request (void *cls,
 		struct GNUNET_SERVER_Client *client,
 		const struct GNUNET_MessageHeader *message)
 {
-	struct GNUNET_SCRB_ClntSbscrbRqst *hdr;
-	hdr = (struct GNUNET_SCRB_ClntSbscrbRqst *) message;
+	struct ClientEntry* ce;
+	if((ce = make_client_entry (client)) == NULL)
+		return;
 
 	struct GNUNET_SCRB_ServiceSubscription* subs;
-	subs = 	GNUNET_CONTAINER_multihashmap_get(subscribers, &hdr->group_id);
+	subs = 	GNUNET_CONTAINER_multihashmap_get(subscribers, &ce->cid);
 
 	if(subs == NULL)
 	{
@@ -1059,10 +1071,11 @@ handle_cl_create_request (void *cls,
 		struct GNUNET_SERVER_Client *client,
 		const struct GNUNET_MessageHeader *message)
 {
-	struct GNUNET_SCRB_ClientRequestCreate *hdr;
-	hdr = (struct GNUNET_SCRB_ClientRequestCreate *) message;
-
-	const struct GNUNET_HashCode group_id = hdr->group_id;
+	struct ClientEntry* ce;
+	if((ce = make_client_entry (client)) == NULL)
+		return;
+	
+	const struct GNUNET_HashCode group_id = ce->cid;
 
 	struct GNUNET_BLOCK_SCRB_Create create_block;
 
@@ -1086,11 +1099,21 @@ handle_cl_create_request (void *cls,
 	GNUNET_SERVER_receive_done (client, GNUNET_OK);
 }
 
-static void
-handle_cl_id_request (void *cls,
-		struct GNUNET_SERVER_Client *client,
-		const struct GNUNET_MessageHeader *message)
+static struct ClientEntry*
+make_client_entry (	struct GNUNET_SERVER_Client *client)
 {
+	struct ClientEntry* ce;
+	ce = GNUNET_SERVER_client_get_user_context(client, struct ClientEntry);
+	
+	if(NULL != ce)
+		return ce;
+	
+	if(NULL == nc)
+	{
+		GNUNET_SERVER_receive_done(client, GNUNET_SYSERR);
+		return NULL;
+	}
+	
 	//increase id counter
 	id_counter++;
 	struct GNUNET_HashCode ego_hash;
@@ -1099,6 +1122,7 @@ handle_cl_id_request (void *cls,
 			&ego_hash);
 
 	//concatenate my_identity_hash together with id counter
+	//the hash code is necessary for a group creation
 	struct GNUNET_HashCode *client_hash = GNUNET_new(struct GNUNET_HashCode);
 	GNUNET_CRYPTO_hkdf (client_hash, sizeof (struct GNUNET_HashCode),
 			GCRY_MD_SHA512, GCRY_MD_SHA256,
@@ -1106,30 +1130,15 @@ handle_cl_id_request (void *cls,
 			&my_identity_hash, sizeof (my_identity_hash),
 			NULL, 0);
 
-	struct ClientEntry* ce = GNUNET_new(struct ClientEntry);
+	ce = GNUNET_new(struct ClientEntry);
 	ce->cid = client_hash;
-	GNUNET_SERVER_client_keep (client);
 	ce->client = client;
-	ce->mq = GNUNET_MQ_queue_for_server_client(client);
-
-	//put the client in map
-	GNUNET_CONTAINER_multihashmap_put (clients, client_hash, ce,
-			GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
+	GNUNET_SERVER_client_set_user_context (client, ce);
+	GNUNET_SERVER_notification_context_add (nc, client);
 	//put the entry in list for faster search
 	GNUNET_CONTAINER_DLL_insert(cl_head, cl_tail, ce);
 
-	size_t msg_size;
-	struct GNUNET_SCRB_ServiceReplyIdentity* msg;
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_ID_REPLY);
-	msg_size = sizeof(struct GNUNET_SCRB_ServiceReplyIdentity);
-	msg->header.size = htons((uint16_t) msg_size);
-	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_ID_REPLY);
-	msg->cid = *client_hash;
-	msg->sid = my_identity;
-
-	GNUNET_MQ_send (ce->mq, ev);
-
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
+	return ce;
 }
 
 /**
@@ -1305,6 +1314,12 @@ static void
 shutdown_task (void *cls,
 		const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
+	if (NULL == nc)
+		return;
+
+	GNUNET_SERVER_notification_context_destroy (nc);
+	nc = NULL;
+	
 	if (NULL != clients)
 	{
 		GNUNET_CONTAINER_multihashmap_iterate (clients,
@@ -1427,6 +1442,8 @@ run (void *cls,
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
 			&shutdown_task,
 			NULL);
+
+	nc = GNUNET_SERVER_notification_context_create (server, 16);
 
 	clients = GNUNET_CONTAINER_multihashmap_create (256, GNUNET_YES);
 

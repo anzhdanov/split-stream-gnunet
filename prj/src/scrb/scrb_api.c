@@ -71,28 +71,6 @@ receive_publisher_update (void *cls, const struct GNUNET_MessageHeader *msg)
 }
 
 /**
- * Receive reply for service list request
- */
-static void
-receive_service_list_reply (void *cls, const struct GNUNET_MessageHeader *msg)
-{
-	struct GNUNET_SCRB_Handle* eh = cls;
-
-	struct GNUNET_SCRB_SrvcRplySrvcLst* rim = (struct GNUNET_SCRB_SrvcRplySrvcLst*)msg;
-	struct GNUNET_SCRB_ServicePublisher *pub = &rim->pub;
-	GNUNET_CONTAINER_multihashmap_put(services,
-			&pub->group_id,
-			pub,
-			GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE);
-	//take the last publisher in the list and send subscription
-	if(GNUNET_CONTAINER_multihashmap_size(services) == rim->size)
-	{
-		group_id = rim->pub.group_id;
-		GNUNET_SCRB_subscribe(eh, &group_id, &my_identity_hash, NULL, NULL);
-	}
-}
-
-/**
  * Receive reply for create request
  */
 static void
@@ -135,27 +113,6 @@ receive_subscribe_reply (void *cls, const struct GNUNET_MessageHeader *msg)
 	//	leave(eh);
 }
 
-
-/**
- * Receive reply from the service with id
- */
-static void
-receive_id_reply (void *cls, const struct GNUNET_MessageHeader *msg)
-{
-	struct GNUNET_SCRB_Handle* eh = cls;
-
-	const struct GNUNET_SCRB_ServiceReplyIdentity* rim = (struct GNUNET_SCRB_ServiceReplyIdentity*)msg;
-	my_identity_hash = rim->cid;
-	srvc_identity = rim->sid;
-
-	init = 1;
-	if(NULL != eh->cb)
-	{
-		eh->cid = &my_identity_hash;
-		eh->cb(eh);
-	}
-}
-
 static void
 handle_client_scrb_error (void *cls, enum GNUNET_MQ_Error error)
 {
@@ -191,19 +148,6 @@ GNUNET_SCRB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
 			handle_client_scrb_error, eh);
 	GNUNET_assert (NULL != eh->mq);
 	return eh;
-}
-
-void GNUNET_SCRB_request_id(
-		struct GNUNET_SCRB_Handle *eh,
-		void (*cb)(void *cls, struct GNUNET_SCRB_Handle *scrb),
-		void *cb_cls)
-{
-	eh->cb = cb;
-	eh->cb_cls = cb_cls;
-	struct GNUNET_MQ_Envelope *mqm;
-	struct GNUNET_SCRB_ClientRequestIdentity *msg;
-	mqm = GNUNET_MQ_msg (msg, GNUNET_MESSAGE_TYPE_SCRB_ID_REQUEST);
-	GNUNET_MQ_send (eh->mq, mqm);
 }
 
 /**
@@ -244,13 +188,11 @@ void GNUNET_SCRB_request_create(
 
 	size_t msg_size = sizeof(struct GNUNET_SCRB_ClientRequestCreate);
 
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_CREATE_REQUEST);
-
 	msg->header.size = htons((uint16_t) msg_size);
 	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CREATE_REQUEST);
 	msg->group_id = *group_id;
 
-	GNUNET_MQ_send (eh->mq, ev);
+	GNUNET_CLIENT_MANAGER_transmit_now ();
 }
 
 /**
@@ -297,25 +239,6 @@ void GNUNET_SCRB_request_multicast(
 	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_MULTICAST);
 	msg->group_id = *group_id;
 	memcpy(&msg->data, data, sizeof(struct GNUNET_SCRB_MulticastData));
-
-	GNUNET_MQ_send (eh->mq, ev);
-}
-
-
-/**
- * Request create group from the service
- */
-void GNUNET_SCRB_request_service_list(struct GNUNET_SCRB_Handle *eh)
-{
-	struct GNUNET_SCRB_ClntRqstSrvcLst *msg;
-
-	size_t msg_size = sizeof(struct GNUNET_SCRB_ClntRqstSrvcLst);
-
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REQUEST);
-
-	msg->header.size = htons((uint16_t) msg_size);
-	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REQUEST);
-	msg->cid = my_identity_hash;
 
 	GNUNET_MQ_send (eh->mq, ev);
 }

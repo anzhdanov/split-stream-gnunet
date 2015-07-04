@@ -32,6 +32,86 @@
 #include "gnunet_protocols_scrb.h"
 
 /**
+ * Here structures are just copied fron multicast-api.c 
+ *
+ */
+
+struct GNUNET_MULTICAST_OriginTransmitHandle
+{
+	GNUNET_MULTICAST_OriginTransmitNotify notify;
+	void* notify_cls;
+	struct GNUNET_MULTICAST_Origin *origin;
+	
+	uint64_t message_id;
+	uint64_t group_generation;
+	uint64_t fragment_offset;
+};
+
+struct GNUNET_MULTICAST_MemberTransmitHandle
+{
+	GNUNET_MULTICAST_MemberTransmitNotify notify;
+	void* notify_cls;
+	struct GNUNET_MULTICAST_Member *member;
+	
+	uint64_t request_id;
+	uint64_t fragment_offset;
+};
+
+struct GNUNET_MULTICAST_Group
+{
+	const struct GNUNET_CONFIGURATION_Handle *cfg;
+
+	struct GNUNET_CLIENT_MANAGER_Connection *client;
+	
+	struct GNUNET_MessageHeader *connect_msg;
+	
+	GNUNET_MULTICAST_JoinRequestCallback join_req_cb;
+	GNUNET_MULTICAST_MembershipTestCallback member_test_cb;
+	GNUNET_MULTICAST_ReplayFragmentCallback replay_frag_cb;
+	GNUNET_MULTICAST_ReplayMessageCallback replay_msg_cb;
+	GNUNET_MULTICAST_MessageCallback message_cb;
+	void* cb_cls;
+
+	GNUNET_ContinuationCallback disconnect_cb;
+
+	void* disconnect_cls;
+
+	uint8_t in_transmit;
+	
+	uint8_t is_origin;
+
+	uint8_t is_disconnecting;
+};
+
+struct GNUNET_MULTICAST_Origin
+{
+	struct GNUNET_MULTICAST_Group grp;
+	struct GNUNET_MULTICAST_OriginTransmitHandle tmit;
+	GNUNET_MULTICAST_RequestCallback request_cb;
+};
+
+struct GNUNET_MULTICAST_Member
+{
+	struct GNUNET_MULTICAST_Group grp;
+	struct GNUNET_MULTICAST_MemberTransmitHandle tmit;
+	GNUNET_MULTICAST_JoinDecisionCallback join_dcsn_cb;
+	uint64_t next_fragment_id;
+}
+
+struct GNUNET_MULTICAST_JoinHandle
+{
+	struct GNUNET_MULTICAST_Group *group;
+	/**
+	 * Public key of member requesting join
+	 */
+	struct GNUNET_CRYPTO_EcdsaPublicKey member_key;
+	/**
+	 * Peer identity of member requesting join
+	 */
+	struct GNUNET_PeerIdentity peer;
+}
+
+/**
  * id requested from service
  */
 static struct GNUNET_HashCode my_identity_hash;
@@ -173,26 +253,44 @@ GNUNET_SCRB_disconnect (struct GNUNET_SCRB_Handle *eh)
 }
 
 /**
- * Request create group from the service
+ * Start a multicast group
  */
-void GNUNET_SCRB_request_create(
-		struct GNUNET_SCRB_Handle *eh,
-		const struct GNUNET_HashCode* group_id,
-		void (*cb)(),
-		void *cb_cls)
+struct GNUNET_MULTICAST_Origin*
+GNUNET_MULTICAST_origin_start( const struct GNUNET_CONFIGURATION_Handle *cfg,
+							   const struct GNUNET_CRYPTO_EdssaPrivateKey* priv_key,
+							   uint64_t max_fragment_id,
+							   GNUNET_MULTICAST_JoinRequestCallback join_request_cb,
+							   GNUNET_MULTICAST_MembershipTestCallback member_test_cb,
+							   GNUNET_MULTICAST_ReplayFragmentCallback replay_frag_cb,
+							   GNUNET_MULTICAST_ReplayMessageCallback replay_msg_cb,
+							   GNUNET_MULTICAST_RequestCallback request_cb,
+							   GNUNET_MULTICAST_MessageCallback message_cb,
+							   void *cls)
 {
-	eh->cb = cb;
-	eh->cb_cls = cb_cls;
+	struct GNUNET_MULTICAST_Origin *orig = GNUNET_malloc(sizeof(*orig));
+	struct GNUNET_MULTICAST_Group *grp = &orig->grp;
+	struct MulticastOriginStartMessage *start = GNUNET_malloc(sizeof(*start));
 
-	struct GNUNET_SCRB_ClientRequestCreate *msg;
+	start->header.type = htons(GNUNET_MESSAGE_TYPE_MULTICAST_ORIGIN_START);
+	start->header.size = htons(sizeof(*start));
+	start->max_fragment_id = max_fragment_id;
+	memcpy(&start->group_key, priv_key, sizeof(*priv_key));
 
-	size_t msg_size = sizeof(struct GNUNET_SCRB_ClientRequestCreate);
+	grp->connect_msg = (struct GNUNET_MessageHeader*) start;
+	grp->is_origin = GNUNET_YES;
+	grp->cfg = cfg;
+	
+	grp->cb_cls = cls;
+	grp->join_req_cb = join_request_cb;
+	grp->member_test_cb = member_test_cb;
+	grp->replay_frag_cb = replay_frag_cb;
+	grp->replay_msg_cb = replay_msg_cb;
+	grp->message_cb = message_cb;
 
-	msg->header.size = htons((uint16_t) msg_size);
-	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CREATE_REQUEST);
-	msg->group_id = *group_id;
-
-	GNUNET_CLIENT_MANAGER_transmit_now ();
+	orig->request_cb = request_cb;
+	grp->client = GNUNET_CLIENT_MANAGER_connect (cfg, "scrb", origin_handlers);
+	GNUNET_CLIENT_MANAGER_set_user_context_ (grp->client, orig, sizeof(*grp));
+	group_send_connect_msg(grp);
 }
 
 /**

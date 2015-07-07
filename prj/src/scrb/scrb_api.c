@@ -111,6 +111,28 @@ struct GNUNET_MULTICAST_JoinHandle
 	struct GNUNET_PeerIdentity peer;
 }
 
+struct GNUNET_MULtiCAST_MembershipTestHandle
+{
+};
+
+struct GNUNET_MULTICAST_ReplayHandle
+{
+};
+
+struct GNUNET_MULTICAST_MemberReplayHandle
+{
+};
+
+static void
+group_send_connect_msg (struct GNUNET_MULTICAST_Group *grp)
+{
+	uint16_t cmsg_size = ntohs(grp->connect_msg->size);
+	struct GNUNET_MessageHeader *cmsg = GNUNET_malloc(cmsg_size);
+	memcpy(cmsg, grp->connect_msg, cmsg_size);
+	GNUNET_CLIENT_MANAGER_transmit_now(grp->client, cmsg);
+
+};
+
 /**
  * id requested from service
  */
@@ -252,6 +274,22 @@ GNUNET_SCRB_disconnect (struct GNUNET_SCRB_Handle *eh)
 	GNUNET_free (eh);
 }
 
+void GNUNET_SCRB_request_create(
+		struct GNUNET_SCRB_Handle *eh,
+		const struct GNUNET_HashCode* group_id,
+		void (*cb)(),
+		void *cb_cls){
+	eh->cb = cb;
+	eh->cb_cls = cb_cls;
+
+	struct GNUNET_SCRB_ClientRequestCreate *msg;
+
+	size_t msg_size = sizeof(struct GNUNET_SCRB_ClientRequestCreate);
+
+	msg->header.size = htons((uint16_t) msg_size);
+	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CREATE_REQUEST);
+	msg->group_id = *group_id;
+}
 /**
  * Start a multicast group
  */
@@ -288,7 +326,7 @@ GNUNET_MULTICAST_origin_start( const struct GNUNET_CONFIGURATION_Handle *cfg,
 	grp->message_cb = message_cb;
 
 	orig->request_cb = request_cb;
-	grp->client = GNUNET_CLIENT_MANAGER_connect (cfg, "scrb", origin_handlers);
+	grp->client = GNUNET_CLIENT_MANAGER_connect(cfg, "scrb", origin_handlers);
 	GNUNET_CLIENT_MANAGER_set_user_context_ (grp->client, orig, sizeof(*grp));
 	group_send_connect_msg(grp);
 }

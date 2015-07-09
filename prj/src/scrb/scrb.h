@@ -143,6 +143,22 @@ struct GNUNET_SCRB_UpdateSubscriber
 	int last;
 };
 
+struct GNUNET_SCRB_UnicastMessage
+{
+	struct GNUNET_SCRB_MessageHeader header;
+
+	char type;
+
+	struct GNUNET_SCRB_UnicastData data;
+
+	struct GNUNET_HashCode group_id;
+
+	struct GNUNET_HashCode source_id;
+
+	int last;
+};
+
+
 struct GNUNET_SCRB_ClntRqstLv
 {
 	struct GNUNET_MessageHeader header;

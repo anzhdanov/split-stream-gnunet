@@ -25,9 +25,27 @@
  */
 
 
-#include "handle.h"
+#include "platform.h"
+#include "gnunet_util_lib.h"
+#include "gnunet_multicast_service.h"
 #include "scrb.h"
-#include "gnunet_protocols_scrb.h"
+
+#define LOG(kind,...) GNUNET_log_from (kind, "scrb-api",__VA_ARGS__)
+
+struct GNUNET_SCRB_PublisherTransmitHandle
+{
+	GNUNET_SCRB_PublisherTransmitNotify ptn_cb;
+	void* notify_cls;
+	struct GNUNET_SCRB_ClientPublisher *pub;	
+}
+
+struct GNUNET_SCRB_SubscriberTransmitHandle
+{
+	GNUNET_SCRB_SubscriberTransmitNotify notify;
+	void* notify_cls;
+	struct GNUNET_SCRB_ClientSubscriber *sub;
+}
+
 
 /**
  * Scribe group entry on the client side   
@@ -51,43 +69,41 @@ struct GNUNET_SCRB_Group
 	 */
 	int size;
 
-	GNUNET_MULTICAST_ChildAddedCallback join_req_cb;
-	GNUNET_MULTICAST_ChildDeletedCallback member_test_cb;
+	GNUNET_SCRB_CreateCallback create_cb;
+	GNUNET_SCRB_SubscribeCallback subscrb_cb;
+	GNUNET_SCRB_LeaveCallback leave_cb;
+	GNUNET_SCRB_GroupChangeEventCallback group_change_cb;
+    GNUNET_SCRB_PublishRequestCallback pub_cb;
+	GNUNET_SCRB_PubUnicastRequestCallback pub_unicst_cb;
+	GNUNET_SCRB_SubUnicastRequestCallback sub_unicst_cb;
+	GNUNET_SCRB_TestGroupCreationCallback test_group_created_cb;
+	GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb;
 	void* cb_cls;
 	
 	GNUNET_ContinuationCallback cont_cb;
-
 	void* cont_cls;
 };
 
 struct GNUNET_SCRB_ClientPublisher
 {
 	struct GNUNET_SCRB_Group grp;
-	
 	const struct GNUNET_SCRB_Credentials cred;
-	
-	GNUNET_SCRB_CreateFailedCallback create_failed_cb;
-	GNUNET_SCRB_CreateSuccessfullCallback create_success_cb;
-	GNUNET_SCRB_PublishFailedCallback pub_fail_cb;
-	GNUNET_SCRB_TestGroupCreatedCallback test_group_created_cb;
-	
-	struct GNUNET_MULTICAST_PublisherTransmitHandle pth;
+	struct GNUNET_SCRB_PublisherTransmitHandle pth;
 };
 
 struct GNUNET_SCRB_ClientSubscriber
 {
 	struct GNUNET_MULTICAST_Group grp;
+	const struct GNUNET_SCRB_Credentials cred;
 	struct GNUNET_MULTICAST_SubscriberTransmitHandle sth;
-	
-	GNUNET_SCRB_SubscribeFailedCallback subscrb_failed_cb;
-	GNUNET_SCRB_SubscribeSuccessfullCallback subscrb_success_cb;
-	GNUNET_SCRB_UnicastFailedCallback unicst_fail_cb;
-	GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb;
 	
 }
 
+/**
+ * Send first message to the service after connecting.
+ */
 static void
-group_send_connect_msg (struct GNUNET_MULTICAST_Group *grp)
+pub_send_connect_msg (struct GNUNET_SCRB_Group *grp)
 {
 	uint16_t cmsg_size = ntohs(grp->connect_msg->size);
 	struct GNUNET_MessageHeader *cmsg = GNUNET_malloc(cmsg_size);
@@ -97,42 +113,33 @@ group_send_connect_msg (struct GNUNET_MULTICAST_Group *grp)
 };
 
 /**
- * id requested from service
+ * Got disconnected from service. Reconnect.
  */
-static struct GNUNET_HashCode my_identity_hash;
-/**
- * service id
- */
-static struct GNUNET_PeerIdentity srvc_identity;
-/**
- * Initialization flag
- */
-static uint16_t init;
+static void
+pub_recv_disconnect (void* cls,
+					 struct GNUNET_CLIENT_MANAGER_Connection* client,
+					 const struct GNUNET_MessageHeader* msg)
+{
+	struct GNUNET_SCRB_Group*
+		grp = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*grp));
+	GNUNET_CLIENT_MANAGER_reconnect (client);
+	pub_send_connect_msg(grp);
+}
 
-/**
- * Rendevous point
- *
- */
-static struct GNUNET_PeerIdentity* rp;
-/**
- * Publish status
- */
-static int publish_status;
-
-/**
- * Services available from the service
- */
-static struct GNUNET_CONTAINER_MultiHashMap *services;
-/**
- * group to which the client subscribes
- */
-static struct GNUNET_HashCode group_id;
 
 static void
-receive_publisher_update (void *cls, const struct GNUNET_MessageHeader *msg)
+pub_receive_unicast (void *cls,
+					 struct GNUNET_CLIENT_MANAGER_Connection *client,
+					 const struct GNUNET_MessageHeader *msg)
 {
-	struct GNUNET_SCRB_UpdateSubscriber* up = (struct GNUNET_SCRB_UpdateSubscriber*)msg;
-	fprintf(stderr, "%.1024s", up->data.data);
+	struct GNUNET_SCRB_Group *
+		grp = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*grp));
+	struct GNUNET_SCRB_MessageHeader* um = (struct GNUNET_SCRB_MessageHeader*)msg;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				"Calling message callback with a message of size %u.\n",
+				ntohs(um->header->header.size));
+	if(NULL != grp->pub_unicst_mes_cb)
+		grp->pub_unicst_mes_cb(grp->cb_cls, um);
 }
 
 /**

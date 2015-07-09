@@ -98,10 +98,10 @@ GNUNET_NETWORK_STRUCT_END
 /**
  * Content of a publish (multicast) message
  */
-struct GNUNET_SCRB_PublishContent
+struct GNUNET_SCRB_UnicastData
 {
 	/**
-	 * Data of the multicast message
+	 * Data of the unicast
 	 */
 	char* data;
 	/**
@@ -123,7 +123,7 @@ enum EventType;
  * Functions with the signature are called on receiving (of response to) create request.
  * In case of failure, the client should retry the request or take an appropriate action.
  * @param cls      Callback closure
- * @param cfg       Configuration handle
+ * @param cfg      Configuration handle
  * @param group_id Id of the group to subscribe to
  * @param cred     Credentials of the entity subscribing to the topic
  */
@@ -215,18 +215,24 @@ typedef void
 				const struct GNUNET_SCRB_Credentials cred);
 
 /**
- * Functions with the signature are called on a unicast request response
+ * Functions with the signature are called on receive of a unicast message from service
+ * by publisher
  * @param cls              Callback closure
- * @param eh               Configuration handle
- * @param group_id         Id of the group to subscribe to
- * @param cred             Credentials of client subscribing to the group
+ * @param msg              Message from the service
  */
 typedef void
-(*GNUNET_SCRB_UnicastRequestCallback)(void *cls,
-				struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_HashCode* client_id,
-				const struct GNUNET_SCRB_Credentials cred);
+(*GNUNET_SCRB_PubUnicastMessageCallback)(void *cls,
+				const struct GNUNET_SCRB_UnicastMessage* msg);
+
+/**
+ * Functions with the signature are called on receive of a unicast message from service
+ * by subscriber
+ * @param cls              Callback closure
+ * @param msg              Message from the service
+ */
+typedef void
+(*GNUNET_SCRB_SubUnicastMessageCallback)(void *cls,
+				const struct GNUNET_SCRB_UnicastMessage* msg);
 
 
 /**
@@ -242,8 +248,9 @@ typedef void
  * @param subscription_cb       The function can be called on receive of a group subscription (response)
  * @param leave_cb              The function can be called on receive of a group leave (response)
  * @param group_change_cb       The function can be called on receive of a group change event
- * @param pub_fail_cb           The function can be called on receive of a publish request
- * @param unicst_fail_cb        The function can be called on receive of a unicast request
+ * @param pub_cb                The function can be called on receive of a publish request
+ * @param pub_unicst_mes_cb     The function can be called on receive of a unicast message by publisher
+ * @param sub_unicst_mes_cb     The function can be called on receive of a unicast message by subscriber
  * @param test_group_created_cb The function can be called to test the group creation
  * @param test_group_sbs_cb     The function can be called to test the group subscription
  * @param cont_cb               The function can be called to continue invocation queue
@@ -257,8 +264,9 @@ GNUNET_SCRB_create(const struct GNUNET_CONFIGURATION_Handle *cfg,
 		GNUNET_SCRB_SubscribeCallback subscrb_cb,
 		GNUNET_SCRB_LeaveCallback leave_cb,
 		GNUNET_SCRB_GroupChangeEventCallback group_change_cb,
-        GNUNET_SCRB_PublishRequestCallback pub_fail_cb,
-		GNUNET_SCRB_UnicastRequestCallback unicst_fail_cb,
+        GNUNET_SCRB_PublishRequestCallback pub_cb,
+		GNUNET_SCRB_PubUnicastMessageCallback pub_unicst_mes_cb,
+		GNUNET_SCRB_PubUnicastMessageCallback sub_unicst_mes_cb,
 		GNUNET_SCRB_TestGroupCreationCallback test_group_created_cb,
 		GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb,
 		GNUNET_ContinuationCallback cont_cb,
@@ -275,8 +283,8 @@ GNUNET_SCRB_create(const struct GNUNET_CONFIGURATION_Handle *cfg,
  * @param subscription_cb       The function can be called on receive of a group subscription (response)
  * @param leave_cb              The function can be called on receive of a group leave (response)
  * @param group_change_cb       The function can be called on receive of a group change event
- * @param pub_fail_cb           The function can be called on failure of  a publish request
- * @param unicst_fail_cb        The function can be called on failure of  a unicast fails
+ * @param pub_cb                The function can be called on receive of response of a publish request
+ * @param unicst_mes_cb         The function can be called on receive of a unicast message
  * @param test_group_created_cb The function can be called to test the group creation
  * @param test_group_sbs_cb     The function can be called to test a client subscription
  * @param cls                   Callback closure
@@ -291,8 +299,8 @@ GNUNET_SCRB_subscribe(struct GNUNET_CONFIGURATION_Handle *cfg,
 		GNUNET_SCRB_SubscribeCallback subscrb_cb,
 		GNUNET_SCRB_LeaveCallback leave_cb,
 		GNUNET_SCRB_GroupChangeEventCallback group_change_cb,
-        GNUNET_SCRB_PublishRequestCallback pub_fail_cb,
-		GNUNET_SCRB_UnicastRequestCallback unicst_fail_cb,
+        GNUNET_SCRB_PublishRequestCallback pub_cb,
+		GNUNET_SCRB_UnicastMessageCallback unicst_mes_cb,
 		GNUNET_SCRB_TestGroupCreationCallback test_group_created_cb,
 		GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb,
 		GNUNET_ContinuationCallback cont_cb,
@@ -313,6 +321,30 @@ GNUNET_SCRB_unsubscribe(struct GNUNET_CONFIGURATION_Handle *cfg,
 		const struct GNUNET_SCRB_Credentials cred,
 		GNUNET_ContinuationCallback cont_cb,
 		void* cls);
+
+/**
+ * Functions with the signature are used to make transmission messages for publishers.
+ * @param cls        Closure
+ * @param data_size  The number of bytes initially available in @a data.
+ * @param data       A buffer to write the message body with at most @a data_size bytes.
+ * @return           The message size
+ */
+typedef size_t
+(*GNUNET_SCRB_PublisherTransmitNotify)(void* cls,
+									   size_t data_size, 
+									   void* data);
+/**
+ * Functions with the signature are used to make transmission messages for subscribers.
+ * @param cls        Closure
+ * @param data_size  The number of bytes initially available in @a data.
+ * @param data       A buffer to write the message body with at most @a data_size bytes.
+ * @return           The message size
+ */
+typedef size_t
+(*GNUNET_SCRB_SubscriberTransmitNotify)(void* cls,
+									   size_t data_size, 
+									   void* data);
+
 
 /**
  * Handle for a request to send a message to all group members
@@ -336,8 +368,9 @@ struct GNUNET_SCRB_PublisherTransmitHandle*
 GNUNET_SCRB_publish(
 		struct GNUNET_CONFIGURATION_Handle *cfg,
 		const struct GNUNET_HashCode* group_id,
-		const struct GNUNET_SCRB_MulticastContent* content,
 		const struct GNUNET_SCRB_Credentials cred,
+		GNUNET_SCRB_PublisherTransmitNotify ptn_cb,
+		void* notify_cls,
 		GNUNET_ContinuationCallback cont_cb,
 		void* cls);
 

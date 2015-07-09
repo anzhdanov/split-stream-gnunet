@@ -51,12 +51,12 @@ struct GNUNET_SCRB_Credentials;
 /**
  * Handle for a publisher
  */
-struct GNUNET_SCRB_Publisher;
+struct GNUNET_SCRB_ClientPublisher;
 
 /**
  * Handle for a subscriber
  */
-struct GNUNET_SCRB_Subscriber;
+struct GNUNET_SCRB_ClientSubscriber;
 
 GNUNET_NETWORK_STRUCT_BEGIN
 
@@ -86,6 +86,10 @@ struct GNUNET_SCRB_MessageHeader
 	 * Destination of the multicast message
 	 */
 	struct GNUNET_HashCode dest_id;
+	
+	/**
+	 * Followed by the message body
+	 */
     
 };
 
@@ -94,7 +98,7 @@ GNUNET_NETWORK_STRUCT_END
 /**
  * Content of a publish (multicast) message
  */
-struct GNUNET_SCRB_MulticastContent
+struct GNUNET_SCRB_PublishContent
 {
 	/**
 	 * Data of the multicast message
@@ -111,34 +115,52 @@ struct GNUNET_SCRB_MulticastContent
 };
 
 /**
- * A function with the signature is called whenever a create request is failed.
- * The client should retry the request or take an appropriate action.
+ * Type of group modification event
+ */
+enum EventType;
+
+/**
+ * Functions with the signature are called on receiving (of response to) create request.
+ * In case of failure, the client should retry the request or take an appropriate action.
  * @param cls      Callback closure
- * @param eh       Configuration handle
+ * @param cfg       Configuration handle
  * @param group_id Id of the group to subscribe to
  * @param cred     Credentials of the entity subscribing to the topic
  */
 typedef void
-(*GNUNET_SCRB_CreateFailedCallback)(void *cls,
+(*GNUNET_SCRB_CreateRequestCallback)(void *cls,
 				struct GNUNET_CONFIGURATION_Handle *cfg,
 				const struct GNUNET_HashCode* group_id,
 				const struct GNUNET_SCRB_Credentials cred);
 
 /**
- * A function with the signature is called whenever a create request is
- * successfull.
+ * Functions with the signature are called whenever there is a change event in the group
+ * structure
  * @param cls      Callback closure
- * @param eh       Configuration handle
+ * @param cfg      Configuration handle
  * @param group_id Id of the group to subscribe to
- * @param cred     Credentials of the entity subscribing to the topic
  */
 typedef void
-(*GNUNET_SCRB_CreateSuccessfullCallback)(void *cls,
+(*GNUNET_SCRB_GroupChangeEventCallback)(void *cls,
 				struct GNUNET_CONFIGURATION_Handle *cfg,
 				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_SCRB_Credentials cred);
+				EventType e);
+
 /**
- * The function with the signature is called whenever it is necessary to test
+ * Functions with the signature are called on receive of publishing request response
+ * @param cls      Callback closure
+ * @param cfg      Configuration handle
+ * @param group_id Id of the group to subscribe to
+ * @param child_id Id of the child added
+ */
+typedef void
+(*GNUNET_SCRB_PublishRequestCallback)(void *cls,
+				struct GNUNET_CONFIGURATION_Handle *cfg,
+				const struct GNUNET_HashCode* group_id,
+				const struct GNUNET_SCRB_MulticastContent* content);
+
+/**
+ * Functions with the signature are called whenever it is necessary to test
  * that the group with given id has been created.
  * @param cls      Callback closure
  * @param eh       Configuration handle
@@ -146,70 +168,13 @@ typedef void
  * @param cred     Credentials of the entity subscribing to the topic
  */
 typedef int
-(*GNUNET_SCRB_TestGroupCreatedCallback)(void *cls,
+(*GNUNET_SCRB_TestGroupCreationCallback)(void *cls,
 				struct GNUNET_CONFIGURATION_Handle *cfg,
 				const struct GNUNET_HashCode* group_id);
 
 /**
- * The client sends a request to service to create a group.
- * If the credentials are valid, the service gives a successfull group creation
- * response.
- * Other clients should subscribe with the group_id in order to get information.
- * @param cls              Callback closure
- * @param cfg              Configuration handle
- * @param group_id         Id of the group created
- * @param cred             Credentials of the entity creating a topic
- * @param create_failed_cb The function can be called on the group creation
- * failure
- * @param create_success_cb The function can be called on the group creation
- * success
- * @param test_group_created_cb The function can be called to test the group
- * has been successfully created
- * @param cont_cb The function can be called to continue invocation queue
- * @return Handle for the publisher, NULL on error
- */
-struct GNUNET_SCRB_Publisher*
-GNUNET_SCRB_create(const struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_HashCode* group_id,
-		const struct GNUNET_SCRB_Credentials cred,
-		GNUNET_SCRB_CreateFailedCallback create_failed_cb,
-		GNUNET_SCRB_CreateSuccessfullCallback create_success_cb,
-		GNUNET_SCRB_TestGroupCreatedCallback test_group_created_cb,
-		GNUNET_ContinuationCallback cont_cb,
-		void* cls);
-
-/**
- * Functions with the signature are called whenever a subscribe request failed.
- * The client should retry the request or take an appropriate action.
- * @param cls              Callback closure
- * @param eh               Configuration handle
- * @param group_id         Id of the group to subscribe to
- * @param cred             Credentials of client subscribing to the group
- */
-typedef void
-(*GNUNET_SCRB_SubscribeFailedCallback)(void *cls,
-				struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_SCRB_Credentials cred);
-
-/**
- * Functions with the signature are called whenever a subscirbe request is
- * successfull.
- * @param cls              Callback closure
- * @param eh               Configuration handle
- * @param group_id         Id of the group to subscribe to
- * @param cred             Credentials of client subscribing to the group
- */
-typedef void
-(*GNUNET_SCRB_SubscribeSuccessfullCallback)(void *cls,
-				struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_HashCode* client_id
-				const struct GNUNET_SCRB_Credentials cred);
-
-/**
  * Functions with the signature are called whenever it is necessary to test
- * a subscription.
+ * a subscription of client for the group_id.
  * @param cls      Callback closure
  * @param eh       Scribe configuration handle
  * @param group_id Id of the group to subscribe to
@@ -221,93 +186,123 @@ typedef int
 			    const struct GNUNET_HashCode* group_id,
 				const struct GNUNET_HashCode* client_id);
 
+
+/**
+ * Functions with the signature are called on receiving (of  response to) subscribe request.
+ * In case of failure, the client should retry the request or take an appropriate action.
+ * @param cls              Callback closure
+ * @param eh               Configuration handle
+ * @param group_id         Id of the group to subscribe to
+ * @param cred             Credentials of client subscribing to the group
+ */
+typedef void
+(*GNUNET_SCRB_SubscribeRequestCallback)(void *cls,
+				struct GNUNET_CONFIGURATION_Handle *cfg,
+				const struct GNUNET_HashCode* group_id,
+				const struct GNUNET_SCRB_Credentials cred);
+/**
+ * Functions with the signature are called on receive (of  response to) leave request.
+ * In case of failure, the client should retry the request or take an appropriate action.
+ * @param cls              Callback closure
+ * @param eh               Configuration handle
+ * @param group_id         Id of the group to subscribe to
+ * @param cred             Credentials of client subscribing to the group
+ */
+typedef void
+(*GNUNET_SCRB_LeaveRequestCallback)(void *cls,
+				struct GNUNET_CONFIGURATION_Handle *cfg,
+				const struct GNUNET_HashCode* group_id,
+				const struct GNUNET_SCRB_Credentials cred);
+
+/**
+ * Functions with the signature are called on a unicast request response
+ * @param cls              Callback closure
+ * @param eh               Configuration handle
+ * @param group_id         Id of the group to subscribe to
+ * @param cred             Credentials of client subscribing to the group
+ */
+typedef void
+(*GNUNET_SCRB_UnicastRequestCallback)(void *cls,
+				struct GNUNET_CONFIGURATION_Handle *cfg,
+				const struct GNUNET_HashCode* group_id,
+				const struct GNUNET_HashCode* client_id,
+				const struct GNUNET_SCRB_Credentials cred);
+
+
+/**
+ * The client sends a request to service to create a group.
+ * If the credentials are valid, the service gives a successfull group creation
+ * response.
+ * Other clients should subscribe with the group_id in order to get information.
+ * @param cls                   Callback closure
+ * @param cfg                   Configuration handle
+ * @param group_id              Id of the group created
+ * @param cred                  Credentials of the entity creating a topic
+ * @param create_cb             The function can be called on receive of a group creation (response)
+ * @param subscription_cb       The function can be called on receive of a group subscription (response)
+ * @param leave_cb              The function can be called on receive of a group leave (response)
+ * @param group_change_cb       The function can be called on receive of a group change event
+ * @param pub_fail_cb           The function can be called on receive of a publish request
+ * @param unicst_fail_cb        The function can be called on receive of a unicast request
+ * @param test_group_created_cb The function can be called to test the group creation
+ * @param test_group_sbs_cb     The function can be called to test the group subscription
+ * @param cont_cb               The function can be called to continue invocation queue
+ * @return Handle for the publisher, NULL on error
+ */
+struct GNUNET_SCRB_Publisher*
+GNUNET_SCRB_create(const struct GNUNET_CONFIGURATION_Handle *cfg,
+		const struct GNUNET_HashCode* group_id,
+		const struct GNUNET_SCRB_Credentials cred,
+		GNUNET_SCRB_CreateCallback create_cb,
+		GNUNET_SCRB_SubscribeCallback subscrb_cb,
+		GNUNET_SCRB_LeaveCallback leave_cb,
+		GNUNET_SCRB_GroupChangeEventCallback group_change_cb,
+        GNUNET_SCRB_PublishRequestCallback pub_fail_cb,
+		GNUNET_SCRB_UnicastRequestCallback unicst_fail_cb,
+		GNUNET_SCRB_TestGroupCreationCallback test_group_created_cb,
+		GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb,
+		GNUNET_ContinuationCallback cont_cb,
+		void* cls);
+
+
 /**
  * Subscribe to a group.
- * @param cfg                Configuration handle
- * @param group_id           Id of the group to subscribe to
- * @param cred               Credentials of the entity subscribing to a topic
- * @param subscrb_failed_cb  The function can be called on the group creation
- * failure
- * @param subscrb_success_cb The function can be called on the group creation
- * success
- * @param test_group_sbs_cb  The function can be called to test the client
- * subscription  with group_id
- * @param cont_cb The function can be called to test the client
- * subscription  with group_id
- * @param cls                Callback closure
+ * @param cfg                   Configuration handle
+ * @param group_id              Id of the group to subscribe to
+ * @param cred                  Credentials of the entity subscribing to a topic
+ * @param cont_cb               The function can be called to test the client
+ * @param create_cb             The function can be called on receive of a group creation (response)
+ * @param subscription_cb       The function can be called on receive of a group subscription (response)
+ * @param leave_cb              The function can be called on receive of a group leave (response)
+ * @param group_change_cb       The function can be called on receive of a group change event
+ * @param pub_fail_cb           The function can be called on failure of  a publish request
+ * @param unicst_fail_cb        The function can be called on failure of  a unicast fails
+ * @param test_group_created_cb The function can be called to test the group creation
+ * @param test_group_sbs_cb     The function can be called to test a client subscription
+ * @param cls                   Callback closure
  * @return Handle for the subscriber, NULL on error
- */
  */
 struct GNUNET_SCRB_Subscriber*
 GNUNET_SCRB_subscribe(struct GNUNET_CONFIGURATION_Handle *cfg,
 		const struct GNUNET_HashCode* group_id,
 		const struct GNUNET_HashCode* client_id,
 		const struct GNUNET_SCRB_Credentials cred,
-		GNUNET_SCRB_SubscribeFailedCallback subscrb_failed_cb,
-		GNUNET_SCRB_SubscribeSuccessfullCallback subscrb_success_cb,
+		GNUNET_SCRB_CreateCallback create_cb,
+		GNUNET_SCRB_SubscribeCallback subscrb_cb,
+		GNUNET_SCRB_LeaveCallback leave_cb,
+		GNUNET_SCRB_GroupChangeEventCallback group_change_cb,
+        GNUNET_SCRB_PublishRequestCallback pub_fail_cb,
+		GNUNET_SCRB_UnicastRequestCallback unicst_fail_cb,
+		GNUNET_SCRB_TestGroupCreationCallback test_group_created_cb,
 		GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb,
 		GNUNET_ContinuationCallback cont_cb,
 		void* cls);
-
-/**
- * Get group subscribers.
- * @param cfg              Configuration handle
- * @param group_id         Id of the group to get subscribers from
- * @param cred             Credentials of the requesting entity
- * @param cont_cb          The function can be called to continue invocation
- * queue
- * @param cls              Callback closure
- * @return                 Pointer to array of subscribers, NULL on error
- */
-struct GNUNET_SCRB_Subscriber*
-GNUNET_SCRB_get_subscribers(struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_HashCode* group_id,
-		const struct GNUNET_SCRB_Credentials cred,
-		GNUNET_ContinuationCallback cont_cb,
-		void* cls);
-
-/**
- * Functions with the signature are called whenever an unsubscribe request 
- * failed.
- * The client should retry the request or take an appropriate action.
- * @param cls              Callback closure
- * @param eh               Configuration handle
- * @param group_id         Id of the group to subscribe to
- * @param cred             Credentials of client subscribing to the group
- */
-typedef void
-(*GNUNET_SCRB_UnsubscribeFailedCallback)(void *cls,
-				struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_SCRB_Credentials cred);
-
-/**
- * Functions with the signature are called whenever an unsubscirbe request is
- * successfull.
- * @param cls              Callback closure
- * @param eh               Configuration handle
- * @param group_id         Id of the group to subscribe to
- * @param cred             Credentials of client subscribing to the group
- */
-typedef void
-(*GNUNET_SCRB_UnsubscribeSuccessfullCallback)(void *cls,
-				struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_HashCode* group_id,
-				const struct GNUNET_HashCode* client_id
-				const struct GNUNET_SCRB_Credentials cred);
-
 
 /**
  * Unsubscribe from a group.
  * @param cfg              Configuration handle
  * @param group_id         Id of the group to unsubscribe from
  * @param cred             Credentials of the entity unsubscribing from a topic
- * @param create_failed_cb The function can be called on the group creation
- * failure
- * @param create_success_cb The function can be called on the group creation
- * success
- * @param test_group_sbs_cb The function can be called to test the client
- * has been successfully subscribed to group with group_id
  * @param cls              Callback closure
  * @return Handle for the subscriber, NULL on error
  */
@@ -316,17 +311,18 @@ GNUNET_SCRB_unsubscribe(struct GNUNET_CONFIGURATION_Handle *cfg,
 		const struct GNUNET_HashCode* group_id,
 		const struct GNUNET_HashCode* client_id,
 		const struct GNUNET_SCRB_Credentials cred,
-		GNUNET_SCRB_UnsubscribeFailedCallback subscrb_failed_cb,
-		GNUNET_SCRB_UnsubscribeSuccessfullCallback subscrb_success_cb,
-		GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb,
 		GNUNET_ContinuationCallback cont_cb,
 		void* cls);
 
 /**
  * Handle for a request to send a message to all group members
  */
-struct GNUNET_SCRB_TransmitMulticastHandle;
+struct GNUNET_SCRB_PublisherTransmitHandle;
 
+/**
+ * Handle for a request to send a message to a group root
+ */
+struct GNUNET_SCRB_SubscriberTransmitHandle;
 
 /**
  * Publish a content.
@@ -336,7 +332,7 @@ struct GNUNET_SCRB_TransmitMulticastHandle;
  * @param cred             Credentials of the entity publishing a content
  * @param cont_cb          Continuation callback
  */
-struct GNUNET_SCRB_TransmitMulticastHandle*
+struct GNUNET_SCRB_PublisherTransmitHandle*
 GNUNET_SCRB_publish(
 		struct GNUNET_CONFIGURATION_Handle *cfg,
 		const struct GNUNET_HashCode* group_id,

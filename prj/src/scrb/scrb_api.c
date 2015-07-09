@@ -21,107 +21,70 @@
 /**
  * @file scrb/scrb_api.c
  * @brief API for scrb
- * @author azhdanov
+ * @author +azhdanov+
  */
-#include <gnunet/platform.h>
-#include <gnunet/gnunet_util_lib.h>
-#include <gnunet/gnunet_multicast_service.h>
-#include <gnunet/gnunet_mq_lib.h>
+
+
 #include "handle.h"
 #include "scrb.h"
 #include "gnunet_protocols_scrb.h"
 
 /**
- * Here structures are just copied fron multicast-api.c 
- *
+ * Scribe group entry on the client side   
  */
-
-struct GNUNET_MULTICAST_OriginTransmitHandle
+struct GNUNET_SCRB_Group
 {
-	GNUNET_MULTICAST_OriginTransmitNotify notify;
-	void* notify_cls;
-	struct GNUNET_MULTICAST_Origin *origin;
-	
-	uint64_t message_id;
-	uint64_t group_generation;
-	uint64_t fragment_offset;
-};
-
-struct GNUNET_MULTICAST_MemberTransmitHandle
-{
-	GNUNET_MULTICAST_MemberTransmitNotify notify;
-	void* notify_cls;
-	struct GNUNET_MULTICAST_Member *member;
-	
-	uint64_t request_id;
-	uint64_t fragment_offset;
-};
-
-struct GNUNET_MULTICAST_Group
-{
+	/**
+	 * Configuration to use
+	 */
 	const struct GNUNET_CONFIGURATION_Handle *cfg;
-
+	/**
+	 * Client connection to the service
+	 */
 	struct GNUNET_CLIENT_MANAGER_Connection *client;
-	
+	/**
+	 * Message to send on reconnect
+	 */
 	struct GNUNET_MessageHeader *connect_msg;
-	
-	GNUNET_MULTICAST_JoinRequestCallback join_req_cb;
-	GNUNET_MULTICAST_MembershipTestCallback member_test_cb;
-	GNUNET_MULTICAST_ReplayFragmentCallback replay_frag_cb;
-	GNUNET_MULTICAST_ReplayMessageCallback replay_msg_cb;
-	GNUNET_MULTICAST_MessageCallback message_cb;
+	/**
+	 * Group size
+	 */
+	int size;
+
+	GNUNET_MULTICAST_ChildAddedCallback join_req_cb;
+	GNUNET_MULTICAST_ChildDeletedCallback member_test_cb;
 	void* cb_cls;
-
-	GNUNET_ContinuationCallback disconnect_cb;
-
-	void* disconnect_cls;
-
-	uint8_t in_transmit;
 	
-	uint8_t is_origin;
+	GNUNET_ContinuationCallback cont_cb;
 
-	uint8_t is_disconnecting;
+	void* cont_cls;
 };
 
-struct GNUNET_MULTICAST_Origin
+struct GNUNET_SCRB_ClientPublisher
+{
+	struct GNUNET_SCRB_Group grp;
+	
+	const struct GNUNET_SCRB_Credentials cred;
+	
+	GNUNET_SCRB_CreateFailedCallback create_failed_cb;
+	GNUNET_SCRB_CreateSuccessfullCallback create_success_cb;
+	GNUNET_SCRB_PublishFailedCallback pub_fail_cb;
+	GNUNET_SCRB_TestGroupCreatedCallback test_group_created_cb;
+	
+	struct GNUNET_MULTICAST_PublisherTransmitHandle pth;
+};
+
+struct GNUNET_SCRB_ClientSubscriber
 {
 	struct GNUNET_MULTICAST_Group grp;
-	struct GNUNET_MULTICAST_OriginTransmitHandle tmit;
-	GNUNET_MULTICAST_RequestCallback request_cb;
-};
-
-struct GNUNET_MULTICAST_Member
-{
-	struct GNUNET_MULTICAST_Group grp;
-	struct GNUNET_MULTICAST_MemberTransmitHandle tmit;
-	GNUNET_MULTICAST_JoinDecisionCallback join_dcsn_cb;
-	uint64_t next_fragment_id;
+	struct GNUNET_MULTICAST_SubscriberTransmitHandle sth;
+	
+	GNUNET_SCRB_SubscribeFailedCallback subscrb_failed_cb;
+	GNUNET_SCRB_SubscribeSuccessfullCallback subscrb_success_cb;
+	GNUNET_SCRB_UnicastFailedCallback unicst_fail_cb;
+	GNUNET_SCRB_TestGroupSubscriptionCallback test_group_sbs_cb;
+	
 }
-
-struct GNUNET_MULTICAST_JoinHandle
-{
-	struct GNUNET_MULTICAST_Group *group;
-	/**
-	 * Public key of member requesting join
-	 */
-	struct GNUNET_CRYPTO_EcdsaPublicKey member_key;
-	/**
-	 * Peer identity of member requesting join
-	 */
-	struct GNUNET_PeerIdentity peer;
-}
-
-struct GNUNET_MULtiCAST_MembershipTestHandle
-{
-};
-
-struct GNUNET_MULTICAST_ReplayHandle
-{
-};
-
-struct GNUNET_MULTICAST_MemberReplayHandle
-{
-};
 
 static void
 group_send_connect_msg (struct GNUNET_MULTICAST_Group *grp)

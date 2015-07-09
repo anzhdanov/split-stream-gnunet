@@ -34,80 +34,10 @@
 
 GNUNET_NETWORK_STRUCT_BEGIN
 
-/**
- * Message from client to GNS service to lookup records.
- */
-struct GNUNET_EXT_ExampleMessage
+
+struct GNUNET_SCRB_ClientCreate
 {
-	/**
-	 * Header including size and type in NBO
-	 */
-	struct GNUNET_MessageHeader header;
-
-	uint32_t a;
-
-	struct INST_STRUCT{
-		uint32_t a;
-		uint32_t b;
-	}inst;
-
-	/* Add more fields here ... */
-};
-
-struct GNUNET_EXT_P2P_PUT
-{
-	/**
-	 * Header including size and type in NBO
-	 */
-	struct GNUNET_MessageHeader header;
-
-	/**
-	 * Source peer
-	 */
-	uint32_t stripe;
-
-};
-
-struct GNUNET_EXT_P2P_GET
-{
-	/**
-	 * Header including size and type in NBO
-	 */
-	struct GNUNET_MessageHeader header;
-
-	/**
-	 * Source peer
-	 */
-	struct GNUNET_PeerIdentity source_peer;
-
-};
-
-/**
- * Message sent from the client to the service to notify the service
- * about the starting of a multicast group with this peers as its origin.
- */
-struct GNUNET_EXT_OriginStartMessage
-{
-	/**
-	 * Type: GNUNET_MESSAGE_TYPE_MULTICAST_ORIGIN_START
-	 */
-	struct GNUNET_MessageHeader header;
-
-	/**_
-	 * Private, non-ephemeral key for the multicast group.
-	 */
-	uint32_t group_key;
-
-};
-
-struct GNUNET_SCRB_ClientRequestIdentity
-{
-	struct GNUNET_MessageHeader header;
-};
-
-struct GNUNET_SCRB_ClientRequestCreate
-{
-	struct GNUNET_MessageHeader header;
+	struct GNUNET_SCRB_MessageHeader header;
 	/**
 	 * group id, hash of client
 	 */

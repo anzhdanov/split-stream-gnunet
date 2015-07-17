@@ -34,46 +34,135 @@
 
 GNUNET_NETWORK_STRUCT_BEGIN
 
-
-struct GNUNET_SCRB_ClientCreate
+struct GNUNET_SCRB_AnycastMessage
 {
 	struct GNUNET_SCRB_MessageHeader header;
 	/**
-	 * group id, hash of client
+	 * Public key of the group the message is anycasted
 	 */
-	struct GNUNET_HashCode group_id;
+	struct GNUNET_CRYPTO_EddsaPublicKey group_key;;
+
+	/**
+	 * Anycast message content
+	 */
+	struct GNUNET_SCRB_Content content;
+};
+
+/**
+ * A subscribe message
+ */
+struct GNUNET_SCRB_SubscribeMessage
+{
+	/**
+	 * The message header
+	 */
+	struct GNUNET_SCRB_MessageHeader header;
+	/**
+	 * Public key of the group the client would like to
+	 * subscribe to
+	 */
+	struct GNUNET_CRYPTO_EddsaPublicKey group_key;
+
+	/**
+	 * The client's private key
+	 */
+	struct GNUNET_CRYPTO_EddsaPrivateKey client_key;
+	/**
+	 * Content of the subscribe message
+	 */
+	struct GNUNET_SCRB_Content content;
+}
+
+/**
+ * Parent sends its identity to child
+ */
+struct GNUNET_SCRB_SubscribeParentMessage
+{
+	/**
+	 * The message header
+	 */
+	struct GNUNET_SCRB_MessageHeader header;
+	/**
+	 * Identity of the parent
+	 */
+	struct GNUNET_PeerIdentity parent;
+	/**
+	 * Group key
+	 */
+	struct GNUNET_CRYPTO_EdssaPublicKey grp_key;
+	/**
+	 * Group key hash
+	 */
+	struct GNUNET_HashCode grp_key_hash;
+};
+
+struct GNUNET_SCRB_SubscribeAckMessage
+{
+	/**
+	 * Path of the message
+	 */
+    struct GNUNET_SCRB_RoutePath path;
+
+    /**
+	 * Topic for which the acknowledgement was received
+	 */
+	struct GNUNET_SCRB_Topic topic;
+}
+
+struct GNUNET_SCRB_SubscribeFailedMessage
+{
+	/**
+	 * The source address
+	 */
+    struct GNUNET_PeerIdentity source;
+
+	/**
+	 * Public key of the group the subscription failed 
+	 */
+	struct GNUNET_CRYPTO_EdssaPublicKey group_key;
+
+	/**
+	 * Path to the member the subscription failed
+	 */
+	struct GNUNET_SCRB_RoutePath path_to_failed;
+	/**
+	 * unique message id
+	 */
+	uint64_t id;
+}
+
+
+struct GNUNET_SCRB_ClientConnectMessage
+{
+	struct GNUNET_SCRB_MessageHeader header;
+	
 };
 
 
-struct GNUNET_SCRB_ServiceReplyIdentity
-{
-	struct GNUNET_MessageHeader header;
-	/**
-	 * peer identity of service
-	 */
-	struct GNUNET_PeerIdentity sid;
-	/**
-	 * client hash code
-	 */
-	struct GNUNET_HashCode cid;
-};
 
-struct GNUNET_SCRB_ServiceReplyCreate
+
+struct GNUNET_SCRB_ServiceCreateAck
 {
-	struct GNUNET_MessageHeader header;
+	struct GNUNET_SCRB_MessageHeader header;
 	/**
 	 * rendevouz point
 	 */
 	struct GNUNET_PeerIdentity rp;
 	/**
-	 * client id
+	 * group id
 	 */
-	struct GNUNET_HashCode cid;
-	/**
-	 * status
-	 */
-	unsigned int status;
+	struct GNUNET_HashCode group_id;
 };
+
+struct GNUNET_SCRB_ServiceCreateFail
+{
+	struct GNUNET_SCRB_MessageHeader header;
+	/**
+	 * group id
+	 */
+	struct GNUNET_HashCode group_id;
+};
+
 
 struct GNUNET_SCRB_ServiceReplySubscribe
 {

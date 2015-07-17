@@ -49,15 +49,27 @@ struct GNUNET_BLOCK_SCRB_Create{
 	struct GNUNET_HashCode cid;
 };
 
-struct GNUNET_BLOCK_SCRB_Join{
-	/**
-	 * Service id
-	 */
-	struct GNUNET_PeerIdentity sid;
-	/**
-	 * Client id
-	 */
-	struct GNUNET_HashCode cid;
+/**
+ * Join block for DHT messages
+ */
+struct GNUNET_BLOCK_SCRB_Join
+{
+	struct GNUNET_CRYPTO_EddsaPublicKey gr_pub_key;
+	
+	struct GNUNET_HashCode gr_pub_key_hash;
+
+	struct GNUNET_CRYPTO_EddsaPrivateKey cl_pr_key;
+	
+	struct GNUNET_CRYPTO_EddsaPublicKey cl_pub_key;
+	
+	struct GNUNET_HashCode cl_pub_key_hash;
+
+	struct GNUNET_PeerIdentity src;
+	
+	struct GNUNET_HashCode src_hash;
+	
+	struct GNUNET_SCRB_Content content;
+	
 };
 
 struct GNUNET_BLOCK_SCRB_Leave{

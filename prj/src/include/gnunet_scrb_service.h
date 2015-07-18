@@ -133,7 +133,11 @@ struct GNUNET_SCRB_RoutePath
 	/**
 	 * Size of the path
 	 */
-	size_t path_size;
+	unsigned int path_length;
+	/**
+	 * Where we are on the path
+	 */	
+	unsigned int offset;
 };
 
 

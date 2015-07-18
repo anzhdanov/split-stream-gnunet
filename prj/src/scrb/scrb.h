@@ -71,7 +71,7 @@ struct GNUNET_SCRB_SubscribeMessage
 	 * Content of the subscribe message
 	 */
 	struct GNUNET_SCRB_Content content;
-}
+};
 
 /**
  * Parent sends its identity to child
@@ -107,29 +107,50 @@ struct GNUNET_SCRB_SubscribeAckMessage
 	 * Topic for which the acknowledgement was received
 	 */
 	struct GNUNET_SCRB_Topic topic;
-}
+};
 
-struct GNUNET_SCRB_SubscribeFailedMessage
+struct GNUNET_SCRB_SubscribeFailMessage
 {
+	/**
+	 * The message header
+	 */
+	struct GNUNET_SCRB_MessageHeader header;
+
 	/**
 	 * The source address
 	 */
-    struct GNUNET_PeerIdentity source;
-
-	/**
-	 * Public key of the group the subscription failed 
-	 */
-	struct GNUNET_CRYPTO_EdssaPublicKey group_key;
+    	struct GNUNET_PeerIdentity source;
 
 	/**
 	 * Path to the member the subscription failed
 	 */
 	struct GNUNET_SCRB_RoutePath path_to_failed;
+	
 	/**
-	 * unique message id
+	 * Public key of the group
+	 */	
+	struct GNUNET_CRYPTO_EdssaPublicKey* grp_key;
+	
+	/**
+	 * Public group key hash
+	 */	
+	struct GNUNET_CRYPTO_HashCode* grp_key_hash;
+	
+};
+
+struct GNUNET_SCRB_ClientSubscribeFailMessage
+{
+	/**
+	 * The message header
 	 */
-	uint64_t id;
-}
+	struct GNUNET_SCRB_MessageHeader header;
+
+	/**
+	 * Public key of the group
+	 */	
+	struct GNUNET_CRYPTO_EdssaPublicKey* grp_key;
+		
+};
 
 
 struct GNUNET_SCRB_ClientConnectMessage

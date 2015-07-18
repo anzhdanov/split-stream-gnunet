@@ -146,7 +146,7 @@ client_receive_subscribe_ack (void *cls,
 
 	if(NULL != grp->subs_ack_cb)
 	{
-		grp->subs_ack_cb(grp->cb_cls, &sam->topic);
+		grp->subs_ack_cb(grp->cb_cls, &sam->grp_key);
 	}
 }
 
@@ -155,19 +155,19 @@ client_receive_subscribe_ack (void *cls,
  */
 static void
 client_receive_subscribe_fail (void *cls,
-							   struct GNUNET_CLIENT_MANAGER_Connection *client,
-							   const struct GNUNET_SCRB_MessageHeader *msg)
+				struct GNUNET_CLIENT_MANAGER_Connection *client,
+				const struct GNUNET_SCRB_MessageHeader *msg)
 {
-	struct GNUNET_SCRB_Client *
+	struct GNUNET_SCRB_Client*
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_SubscribeFailedMessage* sam = (struct GNUNET_SCRB_SubscribeFailedMessage*)msg;
+	struct GNUNET_SCRB_ClientSubscribeFailMessage* sfm = (struct GNUNET_SCRB_ClientSubscribeFailMessage*)msg;
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling a subscribe failed callback with a message of size %u.\n",
-				ntohs(sam->header.size));
+				ntohs(sfm->header.size));
 
-	if(NULL != grp->subs_ack_cb)
+	if(NULL != sclient->subs_fail_cb)
 	{
-		grp->subs_ack_cb(grp->cb_cls, &sam->topic);
+		sclient->subs_fail_cb(sclient->cb_cls, &sfm->grp_key);
 	}
 }
 

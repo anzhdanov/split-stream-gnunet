@@ -21,7 +21,7 @@
 /**
  * @file include/gnunet_protocols_scrb.h
  * @brief constants for network protocols
- * @author +azhdanov+
+ * @author Xi
  */
 
 #ifndef GNUNET_PROTOCOLS_SCRB_H

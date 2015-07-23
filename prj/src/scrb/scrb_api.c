@@ -25,9 +25,9 @@
  */
 
 
-#include "platform.h"
-#include "gnunet_util_lib.h"
-#include "gnunet_multicast_service.h"
+#include "gnunet/platform.h"
+#include "gnunet/gnunet_util_lib.h"
+#include "../include/gnunet_scrb_service.h"
 #include "scrb.h"
 
 #define LOG(kind,...) GNUNET_log_from (kind, "scrb-api",__VA_ARGS__)
@@ -171,7 +171,27 @@ client_receive_subscribe_fail (void *cls,
 	}
 }
 
+/**
+ * Receive subscribe fail
+ */
+static void
+client_receive_child_added (void *cls,
+	struct GNUNET_CLIENT_MANAGER_Connection *client,
+	const struct GNUNET_SCRB_MessageHeader *msg)
+{
+	struct GNUNET_SCRB_Client*
+		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
+	struct GNUNET_SCRB_ClientChildAddMessage*
+		cam = (struct GNUNET_SCRB_ClientChildAddMessage*)msg;
+	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				"Calling a child added callback with a message of size %u.\n",
+				ntohs(cam->header.header.size));
 
+	if(NULL != sclient->child_added_cb)
+	{
+		sclient->child_added_cb(sclient->cb_cls, &cam->grp_key, &cam->child);
+	}
+}
 
 /**
  * Connect to service and ask id.

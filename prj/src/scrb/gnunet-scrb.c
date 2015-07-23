@@ -19,8 +19,8 @@
  */
 
 /**
- * @file ext/gnunet-ext.c
- * @brief ext tool
+ * @file scrb/gnunet-scrb.c
+ * @brief scrb tool
  * @author 
  */
 #include <gnunet/platform.h>

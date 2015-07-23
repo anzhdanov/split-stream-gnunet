@@ -204,9 +204,6 @@ struct GNUNET_SCRB_ClientConnectMessage
 	
 };
 
-
-
-
 struct GNUNET_SCRB_ServiceCreateAck
 {
   struct GNUNET_SCRB_MessageHeader header;

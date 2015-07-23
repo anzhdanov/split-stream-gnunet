@@ -17,6 +17,7 @@ struct GNUNET_SCRB_Policy
 	GNUNET_SCRB_PolicyChildAdded     child_added_cb;
 	GNUNET_SCRB_PolicyChildRemoved   child_removed_cb;
 	GNUNET_SCRB_PolicyRecvAnycastFail recv_anycst_fail_cb;
+	GNUNET_SCRB_PolicyGetNextAnycast  get_next_anycst_cb;
 	void* cls;
 	/**
 	 * A maximum number of children
@@ -107,6 +108,28 @@ default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	}
 };
 
+/**
+ * Returns the next peer to anycast according to the @a policy
+ */
+struct GNUNET_PeerIdentity*
+default_policy_get_next_anycast (const struct GNUNET_SCRB_Policy* policy,
+	struct GNUNET_SCRB_AnycastMessage* msg,
+	void* cls)
+{
+	struct GNUNET_SCRB_RoutePath* to_visit = &msg.to_visit;
+	struct GNUNET_PeerIdentity* next = NULL;
+	if(NULL != to_visit->path){
+		next = GNUNET_malloc(sizeof(*next));	
+		memcpy(next, to_visit->path, sizeof(*next));
+		int i;	
+		for(i = 1; i < to_visit->path_length; i++)
+			to_visit->path[i] = to_visit->path[i+1];
+		to_visit->path[to_visit->path_length - 1] = NULL;
+		to_visit->path_length--;
+	}
+	return next;	
+};
+
 void
 default_policy_child_added (const struct GNUNET_SCRB_Policy* policy
 	const struct GNUNET_CRYPTO_PublicKey* group_key,
@@ -144,6 +167,7 @@ default_policy_recv_anycast_fail (const struct GNUNET_SCRB_Policy* policy,
  * @param child_added_cb      The callback which is called on child adding
  * @param child_removed_cb    The callback which is called on child removal
  * @param recv_anycst_fail_cb The callback which is called on receive of anycast failure
+ * @param get_next_anycst_cb  Gets the next peer to visit according to the policy
  * @param cls                 Closure 
  */
 struct GNUNET_SCRB_Policy*
@@ -153,7 +177,8 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
 						  GNUNET_SCRB_PolicyChildAdded    child_added_cb,
 						  GNUNET_SCRB_PolicyChildRemoved  child_removed_cb,
 						  GNUNET_SCRB_PolicyRecvAnycastFail recv_anycst_fail_cb,
-						  void* cls	)
+						  GNUNET_SCRB_PolicyGetNextAnycast  get_next_anycst_cb,
+						  void* cls)
 {
 	struct GNUNET_SCRB_Policy* policy = GNUNET_malloc(sizeof(*policy));
 	policy->type = type;
@@ -162,6 +187,7 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
 	policy->child_added_cb = child_added_cb;
 	policy->child_removed_cb = child_removed_cb;
 	policy->recv_anycst_fail_cb = recv_anycst_fail_cb;
+	policy->get_next_anycst_cb = get_next_anycst_cb;
 	policy->cls = cls;	
 	return policy;
 };
@@ -170,11 +196,12 @@ struct GNUNET_SCRB_Policy*
 	GNUNET_SCRB_create_default_policy()
 {
 	return GNUNET_SCRB_create_policy(DEFAULT,
-									 &default_policy_allow_subscribe,
-									 &default_policy_direct_anycast,
-									 &default_policy_child_added,
-									 &default_policy_child_removed,
-									 &default_policy_recv_anycast_fail, 
-									 NULL);
+					&default_policy_allow_subscribe,
+					&default_policy_direct_anycast,
+					&default_policy_child_added,
+					&default_policy_child_removed,
+					&default_policy_recv_anycast_fail, 
+					&default_policy_get_next_anycast, 
+					 NULL);
 };
 

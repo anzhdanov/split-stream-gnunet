@@ -59,6 +59,21 @@ typedef void
 	void* cls);
 
 /**
+ * The method with the signature is called when it is necessary to get the
+ * next peer to visit from the anycast message. The peer is removed from the
+ * to visit list.
+ * 
+ * @param policy     Our current policy
+ * @param msg        The anycast message in question
+ * @param cls        Closure
+ * @return next peer on the path according to the @a policy
+ */
+typedef struct GNUNET_PeerIdentity*
+(*GNUNET_SCRB_PolicyGetNextAnycast) (const struct GNUNET_SCRB_Policy* policy,
+	struct GNUNET_SCRB_AnycastMessage* msg,
+	void* cls);
+
+/**
  * Informs the @a policy that @a child was added to a group with the given
  * @a group_key. The @a policy is free to ignore the call.
  *
@@ -122,6 +137,7 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
 						  GNUNET_SCRB_PolicyChildAdded    child_added_cb,
 						  GNUNET_SCRB_PolicyChildRemoved  child_removed_cb,
 						  GNUNET_SCRB_PolicyRecvAnycastFail recv_anycst_fail_cb,
+						  GNUNET_SCRB_PolicyGetNextAnycast  get_next_anycst_cb,
 						  void* cls	);
 /**
  * Create a default policy with default parameters

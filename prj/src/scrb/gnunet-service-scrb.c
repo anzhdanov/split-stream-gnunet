@@ -288,11 +288,11 @@ group_children_remove(struct Group* grp,
 
 /**
  * Size of the group children
- * @param grp           The group
+ * @param nl           Pointer to the children list
  * @return size of the children
  */
 static int 
-group_children_size(struct Group* grp);
+group_children_size(struct NodeList* nl);
 
 /**
  * Check if the children list is empty
@@ -895,7 +895,8 @@ void forward_join(const struct GNUNET_HashCode* key,
 	}
 	
 	//4. check if our policy allows to take on the node
-	if(1 == check_policy(policy, lp, grp->pub_key, content))
+	// as the source provide the last on the path
+	if(NULL != policy->allow_subs_cb && 1 == policy->allow_subs_cb(policy, lp, grp->pub_key, content))
 	{
 		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				   "Hijacking subscribe message from %s to group %s.\n",
@@ -1528,6 +1529,42 @@ cadet_send_subscribe_fail (struct NodeHandle* node, struct GNUNET_PeerIdentity* 
 	cadet_send_msg(node->chn, msg->header.header);
 }
 
+static void
+	cadet_send_direct_anycast(const struct Group* grp,
+							  const struct GNUNET_SCRB_Policy* policy,
+							  struct GNUNET_SCRB_Content* content)
+{
+	struct GNUNET_SCRB_AnycastMessage*
+		msg = GNUNET_malloc (sizeof(*msg));
+	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_ANYCAST);
+	msg->header.header.size = htons(sizeof(*msg));
+	msg->group_key = grp->pub_key;
+	memcpy(&msg->content, content, sizeof(*content));
+	size_t size = group_children_size(grp->nl_head);
+	struct GNUNET_PeerIdentity** children = GNUNET_malloc(size * sizeof(struct GNUNET_PeerIdentity*));
+	struct NodeList* nl = grp->nl_head;
+	//gathering group children
+	while(NULL != nl)
+	{
+		*children++ = nl->node->peer;
+		nl = nl->next;
+	}
+	if(NULL != policy->direct_anycst_cb)
+		policy->direct_anycst_cb(msg, grp->parent->peer, children, size, NULL);
+	struct GNUNET_PeerIdentity* next = NULL;
+	if(NULL != policy->get_next_anycst_cb)
+		next = policy->get_next_anycst_cb(policy, msg, NULL);
+	if(NULL == next)
+	{
+			GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+						"Anycast fail to group %s.\n",
+						GNUNET_h2s (grp->pub_key_hash));
+	}else
+	{
+	}
+	
+};
+
 /**
  * Incoming subscribe parent message
  */ 
@@ -2063,16 +2100,12 @@ group_children_remove(struct Group* grp, struct GNUNET_PeerIdentity* child)
 };
 
 static int 
-group_children_size(struct Group* grp)
+group_children_size(struct NodeList* nl)
 {
-	int size = 0;
-	struct NodeList* nl = grp->nl_head;
-	while(NULL != nl)
-	{
-		size++;
-		nl = nl->next;
-	}
-	return size;
+	if(NULL == nl)
+		return 0;
+	else
+		return 1 + group_children_size(nl->next);
 };
 
 static int 

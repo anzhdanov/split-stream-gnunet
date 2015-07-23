@@ -25,22 +25,11 @@
  */
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>
+//#include <gnunet/gnunet_strings_lib.h>
 #include "gnunet_scrb_service.h"
 #include "gnunet/gnunet_dht_service.h"
 
 static int ret;
-
-static uint32_t source;
-
-static uint32_t node;
-
-
-/**
- * Handle to the service
- */
-
-static struct GNUNET_SCRB_Handle *handle;
-
 
 /**
  * Main function that will be run by the scheduler.
@@ -56,27 +45,7 @@ run (void *cls,
 		const char *cfgfile,
 		const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-	//ret = 0;
-	handle = GNUNET_SCRB_connect(cfg);
-
-	if(NULL == handle)
-		goto error;
-
-	GNUNET_SCRB_request_id(handle, NULL, NULL);
-
-	if(source != 0){
-		publish(handle);
-		//GNUNET_SCRB_request_create(handle, source);
-	}
-
-	if(node != 0){
-		request_list_and_subscribe(handle);
-		//GNUNET_SCRB_request_create(handle, source);
-	}
-
-	error:
-	GNUNET_SCHEDULER_shutdown ();
-	ret = 1;
+	/*main code*/
 }
 
 /**
@@ -90,21 +59,17 @@ int
 main (int argc, char *const *argv)
 {
 	static const struct GNUNET_GETOPT_CommandLineOption options[] = {
-			{'s', "source", NULL,
-					gettext_noop("the flag shows that the client is a source"), 0,
-					&GNUNET_GETOPT_set_one, &source},
-					{'n', "node", NULL,
-							gettext_noop("the flag shows that the client is a node"), 0,
-							&GNUNET_GETOPT_set_one, &node},
-							GNUNET_GETOPT_OPTION_END
+		/* FIXME: add options here */	
+	GNUNET_GETOPT_OPTION_END
 	};
+//	if(GNUNET_OK != GNUNET_STRINGS_get_ut8_args (argc, argv, &argc, &argv))
+//		return 2;
 	return (GNUNET_OK ==
-			GNUNET_PROGRAM_run (argc,
-					argv,
-					"gnunet-scrb [options [value]]",
-					gettext_noop
-					("scrb"),
-					options, &run, NULL)) ? ret : 1;
+			GNUNET_PROGRAM_run (argc, argv, "gnunet-scrb",
+								gettext_noop ("help text"), options, &run,
+								NULL)) ? ret : 1;
+	GNUNET_free((void*) argv);
+	return ret;
 }
 
 /* end of gnunet-scrb.c */

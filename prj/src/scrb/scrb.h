@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include "scrb_publisher.h"
 #include "scrb_subscriber.h"
-#include "scrb_anycast.h"
+#include <gnunet/gnunet_crypto_lib.h>
 
 GNUNET_NETWORK_STRUCT_BEGIN
 
@@ -75,7 +75,7 @@ struct GNUNET_SCRB_SubscribeParentMessage
   /**
    * Group key
    */
-  struct GNUNET_CRYPTO_EdssaPublicKey grp_key;
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
   /**
    * Group key hash
    */
@@ -96,7 +96,7 @@ struct GNUNET_SCRB_SubscribeAckMessage
   /**
    * The group for which the acknowledgement is sent
    */
-  struct GNUNET_CRYPTO_PublicKey grp_key;
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 	
   /**
    * Source of the message
@@ -157,12 +157,12 @@ struct GNUNET_SCRB_SubscribeFailMessage
   /**
    * Public key of the group
    */	
-  struct GNUNET_CRYPTO_EdssaPublicKey* grp_key;
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 	
   /**
    * Public group key hash
    */	
-  struct GNUNET_CRYPTO_HashCode* grp_key_hash;
+  struct GNUNET_HashCode grp_key_hash;
 	
 };
 
@@ -176,11 +176,11 @@ struct GNUNET_SCRB_ClientSubscribeFailMessage
   /**
    * Public key of the group
    */	
-  struct GNUNET_CRYPTO_EdssaPublicKey grp_key;
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 		
 };
 
-struct GNUNET_SCRB_ClientChildAddMessage
+struct GNUNET_SCRB_ClientChildChangeEventMessage
 {
   /**
    * The message header
@@ -190,14 +190,13 @@ struct GNUNET_SCRB_ClientChildAddMessage
   /**
    * Public key of the group
    */	
-  struct GNUNET_CRYPTO_EdssaPublicKey grp_key;
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 
   /**
    * Identity of the child
    */	
   struct GNUNET_PeerIdentity child;	
 };
-
 
 struct GNUNET_SCRB_ClientConnectMessage
 {
@@ -294,26 +293,10 @@ struct GNUNET_SCRB_UpdateSubscriber
 
   struct GNUNET_HashCode group_id;
 
-  struct GNUNET_SCRB_MulticastData data;
+  struct GNUNET_SCRB_Content data;
 
   int last;
 };
-
-struct GNUNET_SCRB_UnicastMessage
-{
-  struct GNUNET_SCRB_MessageHeader header;
-
-  char type;
-
-  struct GNUNET_SCRB_UnicastData data;
-
-  struct GNUNET_HashCode group_id;
-
-  struct GNUNET_HashCode source_id;
-
-  int last;
-};
-
 
 struct GNUNET_SCRB_ClntRqstLv
 {

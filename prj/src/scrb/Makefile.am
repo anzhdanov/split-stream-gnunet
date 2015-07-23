@@ -61,7 +61,7 @@ gnunet_service_scrb_LDFLAGS = \
 gnunet_scrb_SOURCES = \
   gnunet-scrb.c
 gnunet_scrb_LDADD = \
-  -lgnunetutil -lgnunetdht\
+  -lgnunetutil -lgnunetdht \ #-lgnunetstrings\ 
   $(INTLLIBS) \
   scrb_api.o 
 gnunet_scrb_LDFLAGS = \

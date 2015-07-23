@@ -42,7 +42,6 @@ struct PeerList
  * @param cls          Closure
  * @return 1 if the source is accepted, 0 otherwise.
  */
- */
 int
 default_policy_allow_subscribe(const struct GNUNET_SCRB_Policy* policy,
 	const struct GNUNET_PeerIdentity* source,
@@ -98,12 +97,12 @@ default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	if(NULL != parent)
 	{
 		memcpy(++p, parent, sizeof(*p));
-		memcpy(&to_visit->path[0], path, sizeof(*path));
+		memcpy(to_visit->path, path, sizeof(*path));
 		to_visit->path_length = path_length;
 	}else
 	{
 		--path_length;
-		memcpy(to_visit->path, path, child_num * sizeof(*p);
+		memcpy(to_visit->path, path, child_num * sizeof(*p));
 		to_visit->path_length = path_length;
 	}
 };
@@ -164,6 +163,7 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
 	policy->child_removed_cb = child_removed_cb;
 	policy->recv_anycst_fail_cb = recv_anycst_fail_cb;
 	policy->cls = cls;	
+	return policy;
 };
 
 struct GNUNET_SCRB_Policy*
@@ -176,6 +176,5 @@ struct GNUNET_SCRB_Policy*
 									 &default_policy_child_removed,
 									 &default_policy_recv_anycast_fail, 
 									 NULL);
-
 };
 

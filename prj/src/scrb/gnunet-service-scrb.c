@@ -1421,7 +1421,7 @@ static void
 	client_send_child_added (const struct Group* grp, 
 							 const struct GNUNET_PeerIdentity* peer)
 {	
-	struct GNUNET_SCRB_ClientChildAddMessage*
+	struct GNUNET_SCRB_ClientChildChangeEventMessage*
 		msg = GNUNET_malloc (sizeof(*msg));
 
 	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);

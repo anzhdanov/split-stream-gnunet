@@ -61,11 +61,9 @@ gnunet_service_scrb_LDFLAGS = \
 gnunet_scrb_SOURCES = \
   gnunet-scrb.c
 gnunet_scrb_LDADD = \
-  -lgnunetutil -lgnunetdht \ #-lgnunetstrings\ 
+  -lgnunetutil -lgnunetdht \
   $(INTLLIBS) \
-  scrb_api.o 
-gnunet_scrb_LDFLAGS = \
- $(GNUNET_LDFLAGS) $(WINFLAGS) -export-dynamic 
+  libgnunetscrb.la
  
 testbed_scrb_SOURCES = \
   testbed_scrb.c
@@ -73,18 +71,14 @@ testbed_scrb_LDADD = \
   -lgnunetutil \
   -lgnunettestbed \
   $(INTLLIBS) \
-  scrb_api.o
-testbed_scrb_LDFLAGS = \
- $(GNUNET_LDFLAGS) $(WINFLAGS) -export-dynamic 
+  libgnunetscrb.la
 
 test_scrb_api_SOURCES = \
  test_scrb_scrb.c
 test_scrb_api_LDADD = \
   $(top_builddir)/src/scrb/libgnunetscrb.la \
   -lgnunetutil
-test_scrb_api_LDFLAGS = \
- $(GNUNET_LDFLAGS)  $(WINFLAGS) -export-dynamic
-  
+
 plugindir = $(libdir)/gnunet
 plugin_LTLIBRARIES = \
 	libgnunet_plugin_block_scrb.la

@@ -25,8 +25,7 @@
  */
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>
-//#include <gnunet/gnunet_strings_lib.h>
-#include "gnunet_scrb_service.h"
+#include "../include/gnunet_scrb_service.h"
 #include "gnunet/gnunet_dht_service.h"
 
 static int ret;

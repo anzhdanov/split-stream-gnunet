@@ -1,22 +1,22 @@
 /*
-      This file is part of GNUnet
-      (C) 
+  This file is part of GNUnet
+  (C) 
 
-      GNUnet is free software; you can redistribute it and/or modify
-      it under the terms of the GNU General Public License as published
-      by the Free Software Foundation; either version 3, or (at your
-      option) any later version.
+  GNUnet is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published
+  by the Free Software Foundation; either version 3, or (at your
+  option) any later version.
 
-      GNUnet is distributed in the hope that it will be useful, but
-      WITHOUT ANY WARRANTY; without even the implied warranty of
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-      General Public License for more details.
+  GNUnet is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
 
-      You should have received a copy of the GNU General Public License
-      along with GNUnet; see the file COPYING.  If not, write to the
-      Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-      Boston, MA 02111-1307, USA.
- */
+  You should have received a copy of the GNU General Public License
+  along with GNUnet; see the file COPYING.  If not, write to the
+  Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+  Boston, MA 02111-1307, USA.
+*/
 
 /**
  * @file include/gnunet_scrb_service.h
@@ -55,51 +55,51 @@ struct GNUNET_SCRB_Policy;
 
 struct GNUNET_SCRB_MessageHeader
 {
-	/**
-	 * Header for all multicast messages
-	 */
-	struct GNUNET_MessageHeader header;
+  /**
+   * Header for all multicast messages
+   */
+  struct GNUNET_MessageHeader header;
 
-    	/**
-	 * Message priority
-	 */
-    	uint32_t message_priority GNUNET_PACKED;
+  /**
+   * Message priority
+   */
+  uint32_t message_priority GNUNET_PACKED;
 	
-	/**
-	 * ECC signature of the message fragment
-	 * Signature must match the public key of the topic
-	 */
-	struct GNUNET_CRYPTO_EddsaSignature signature;
+  /**
+   * ECC signature of the message fragment
+   * Signature must match the public key of the topic
+   */
+  struct GNUNET_CRYPTO_EddsaSignature signature;
 	
-	/**
-	 * Purpose of the signature and size of the signed data
-	 */
-	struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+  /**
+   * Purpose of the signature and size of the signed data
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
 
-    	/**
-	 * Message id
-	 */
-    	uint64_t message_id GNUNET_PACKED;
+  /**
+   * Message id
+   */
+  uint64_t message_id GNUNET_PACKED;
 
-	/**
-	 * Source of the multicast message
-	 */
-	struct GNUNET_HashCode source_id;
+  /**
+   * Source of the multicast message
+   */
+  struct GNUNET_HashCode source_id;
 	
-	/**
-	 * Destination of the multicast message
-	 */
-	struct GNUNET_HashCode dest_id;
+  /**
+   * Destination of the multicast message
+   */
+  struct GNUNET_HashCode dest_id;
 		
-	/**
-	 * Followed by the message body
-	 */
+  /**
+   * Followed by the message body
+   */
     
 };
 
 enum GNUNET_SCRB_ContentType
 {
-	RAW = 0
+  SUBSCRIBE, MULTICAST
 };
 
 /**
@@ -107,18 +107,18 @@ enum GNUNET_SCRB_ContentType
  */
 struct GNUNET_SCRB_Content
 {
-	/**
-	 * Data of the unicast
-	 */
-	char* data;
-	/**
-	 * Size of the content
-	 */
-	size_t data_size;
-	/**
-	 * Content type
-	 */
-	enum GNUNET_SCRB_ContentType type;
+  /**
+   * Data
+   */
+  char* data;
+  /**
+   * Size
+   */
+  size_t data_size;
+  /**
+   * Content
+   */
+  enum GNUNET_SCRB_ContentType type;
 };
 
 /**
@@ -126,18 +126,18 @@ struct GNUNET_SCRB_Content
  */
 struct GNUNET_SCRB_RoutePath
 {
-	/**
-	 * Path of the message
-	 */
-	struct GNUNET_PeerIdentity* path;
-	/**
-	 * Size of the path
-	 */
-	unsigned int path_length;
-	/**
-	 * Where we are on the path
-	 */	
-	unsigned int offset;
+  /**
+   * Path of the message
+   */
+  struct GNUNET_PeerIdentity* path;
+  /**
+   * Size of the path
+   */
+  unsigned int path_length;
+  /**
+   * Where we are on the path
+   */	
+  unsigned int offset;
 };
 
 
@@ -153,8 +153,8 @@ struct GNUNET_SCRB_RoutePath
  */
 typedef int
 (*GNUNET_SCRB_ClientAnycastCallback)(void* cls,
-				const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-				const struct GNUNET_SCRB_Content* content);
+									 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+									 const struct GNUNET_SCRB_Content* content);
 
 /**
  * Functions with the signature are called when a message is delivered for @a 
@@ -165,8 +165,8 @@ typedef int
  */
 typedef void
 (*GNUNET_SCRB_ClientDeliverCallback)(void* cls,
-				const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-				const struct GNUNET_SCRB_Content* content);
+									 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+									 const struct GNUNET_SCRB_Content* content);
 
 /**
  * Functions with the signature are called which informs the client that
@@ -177,8 +177,8 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_ClientChildAddedCallback)(void* cls,
-				const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-				const struct GNUNET_PeerIdentity* child);
+										const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+										const struct GNUNET_PeerIdentity* child);
 
 /**
  * Functions with the signature are called which informs the client that
@@ -190,8 +190,8 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_ClientChildRemovedCallback)(void* cls,
-					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-					const struct GNUNET_PeerIdentity* child);
+										  const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+										  const struct GNUNET_PeerIdentity* child);
 
 /**
  * Functions with the signature are called when it is necessary to inform the
@@ -202,7 +202,7 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_ClientSubscribeFailedCallback)(void* cls,
-					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key);
+											 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key);
 
 /**
  * Functions with the signature are called which informs the client that
@@ -212,7 +212,7 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_ClientSubscribeSuccessCallback)(void* cls,
-					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key);
+											  const struct GNUNET_CRYPTO_EddsaPublicKey* group_key);
 
 /**
  * Functions with the signature are called when the client gets a response
@@ -223,7 +223,7 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_RequestResultCallback)(void* cls,
-				const struct GNUNET_SCRB_MessageHeader* msg);
+									 const struct GNUNET_SCRB_MessageHeader* msg);
 
 /**
  * A contract for making a subscription.
@@ -269,18 +269,18 @@ typedef void
  */
 struct GNUNET_SCRB_Client*
 GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
-				const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-				const struct GNUNET_CRYPTO_EddsaPrivateKey* client_key,
-				const struct GNUNET_SCRB_Content* content,
-				GNUNET_SCRB_ClientAnycastCallback unicast_cb,
-				GNUNET_SCRB_ClientDeliverCallback deliver_cb,
-				GNUNET_SCRB_ClientChildAddedCallback child_added_cb,
-				GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
-				GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
-				GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
-				void* cb_cls,
-				GNUNET_ContinuationCallback disconnect_cb,
-				void* disconnect_cls);
+					  const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+					  const struct GNUNET_CRYPTO_EddsaPrivateKey* client_key,
+					  const struct GNUNET_SCRB_Content* content,
+					  GNUNET_SCRB_ClientAnycastCallback unicast_cb,
+					  GNUNET_SCRB_ClientDeliverCallback deliver_cb,
+					  GNUNET_SCRB_ClientChildAddedCallback child_added_cb,
+					  GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
+					  GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
+					  GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
+					  void* cb_cls,
+					  GNUNET_ContinuationCallback disconnect_cb,
+					  void* disconnect_cls);
 
 /**
  * Unsubscribes the given @a client from the group with the provided @a group_key.
@@ -293,10 +293,10 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
  */
 void
 GNUNET_SCRB_unsubscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-		const struct GNUNET_SCRB_Client* client,
-		GNUNET_ContinuationCallback cont_cb,
-		void* cls);
+						const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+						const struct GNUNET_SCRB_Client* client,
+						GNUNET_ContinuationCallback cont_cb,
+						void* cls);
 
 /**
  * Functions with the signature are used to make transmission messages for clients
@@ -309,8 +309,8 @@ GNUNET_SCRB_unsubscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
  */
 typedef size_t
 (*GNUNET_SCRB_PublishTransmitNotify)(void* cls,
-				size_t data_size, 
-				void* data);
+									 size_t data_size, 
+									 void* data);
 
 /**
  * Functions with the signature are used to make transmission messages for clients
@@ -323,8 +323,8 @@ typedef size_t
  */
 typedef size_t
 (*GNUNET_SCRB_AnycastTransmitNotify)(void* cls,
-				size_t data_size, 
-				void* data);
+									 size_t data_size, 
+									 void* data);
 
 /**
  * Handle for a request to send a message to all group members
@@ -349,12 +349,12 @@ struct GNUNET_SCRB_AnycastTransmitHandle;
  */
 struct GNUNET_SCRB_PublishTransmitHandle*
 GNUNET_SCRB_publish(struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-		const struct GNUNET_SCRB_Content* content,
-		GNUNET_SCRB_PublishTransmitNotify notify_cb,
-		void* notify_cls,
-		GNUNET_ContinuationCallback cont_cb,
-		void* cls);
+					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+					const struct GNUNET_SCRB_Content* content,
+					GNUNET_SCRB_PublishTransmitNotify notify_cb,
+					void* notify_cls,
+					GNUNET_ContinuationCallback cont_cb,
+					void* cls);
 
 /**
  * Anycasts @a content to a member of a group with the given @a group_key.
@@ -369,12 +369,12 @@ GNUNET_SCRB_publish(struct GNUNET_CONFIGURATION_Handle *cfg,
  */
 struct GNUNET_SCRB_AnycastTransmitHandle*
 GNUNET_SCRB_anycast(const struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-		const struct GNUNET_SCRB_Content* content,
-		GNUNET_SCRB_AnycastTransmitNotify notify_cb,
-		void* notify_cls,
-		GNUNET_ContinuationCallback cont_cb,
-		void* cls);
+					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+					const struct GNUNET_SCRB_Content* content,
+					GNUNET_SCRB_AnycastTransmitNotify notify_cb,
+					void* notify_cls,
+					GNUNET_ContinuationCallback cont_cb,
+					void* cls);
 
 /**
  * Anycasts @a content to a member of a group with the given @a group_key.
@@ -393,13 +393,13 @@ GNUNET_SCRB_anycast(const struct GNUNET_CONFIGURATION_Handle *cfg,
  */
 struct GNUNET_SCRB_AnycastTransmitHandle*
 GNUNET_SCRB_anycast_hint(const struct GNUNET_CONFIGURATION_Handle *cfg,
-		const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
-		const struct GNUNET_SCRB_Content* content,
-		const struct GNUNET_PeerIdentity* hint,
-		GNUNET_SCRB_AnycastTransmitNotify notify_cb,
-		void* notify_cls,
-		GNUNET_ContinuationCallback cont_cb, 
-		void* cls);
+						 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+						 const struct GNUNET_SCRB_Content* content,
+						 const struct GNUNET_PeerIdentity* hint,
+						 GNUNET_SCRB_AnycastTransmitNotify notify_cb,
+						 void* notify_cls,
+						 GNUNET_ContinuationCallback cont_cb, 
+						 void* cls);
 
 /* /\** */
 /*  * The function requests a root for a group with the given @a group_key  */

@@ -144,7 +144,7 @@ client_recv_subscribe_ack (void *cls,
 {
 	struct GNUNET_SCRB_Client *
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_SubscribeAckMessage* sam = (struct GNUNET_SCRB_SubscribeAckMessage*)msg;
+	struct GNUNET_SCRB_SubscribeReplyMessage* sam = (struct GNUNET_SCRB_SubscribeReplyMessage*)msg;
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling a subscribe ack callback with a message of size %u.\n",
 				ntohs(sam->header.header.size));
@@ -165,7 +165,7 @@ client_recv_subscribe_fail (void *cls,
 {
 	struct GNUNET_SCRB_Client*
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_ClientSubscribeFailMessage* sfm = (struct GNUNET_SCRB_ClientSubscribeFailMessage*)msg;
+	struct GNUNET_SCRB_ClientSubscribeReplyMessage* sfm = (struct GNUNET_SCRB_ClientSubscribeReplyMessage*)msg;
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling a subscribe failed callback with a message of size %u.\n",
 				ntohs(sfm->header.header.size));
@@ -186,8 +186,8 @@ client_recv_child_added (void *cls,
 {
 	struct GNUNET_SCRB_Client*
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_ClientChildChangeEventMessage*
-		cam = (struct GNUNET_SCRB_ClientChildChangeEventMessage*)msg;
+	struct GNUNET_SCRB_ChildChangeEventMessage*
+		cam = (struct GNUNET_SCRB_ChildChangeEventMessage*)msg;
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling a child removed callback with a message of size %u.\n",
 				ntohs(cam->header.header.size));
@@ -208,8 +208,8 @@ client_recv_child_removed (void *cls,
 {
 	struct GNUNET_SCRB_Client*
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_ClientChildChangeEventMessage*
-		crm = (struct GNUNET_SCRB_ClientChildChangeEventMessage*)msg;
+	struct GNUNET_SCRB_ChildChangeEventMessage*
+		crm = (struct GNUNET_SCRB_ChildChangeEventMessage*)msg;
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling a child added callback with a message of size %u.\n",
 				ntohs(crm->header.header.size));

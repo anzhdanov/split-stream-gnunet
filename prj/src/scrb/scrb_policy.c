@@ -39,6 +39,7 @@ struct PeerList
  * @param policy       Scribe policy
  * @param source       Identity of the child
  * @param group_key    A public key of the group
+ * @param groups       A container with groups
  * @param content      Content that came with the message
  * @param cls          Closure
  * @return 1 if the source is accepted, 0 otherwise.
@@ -47,10 +48,12 @@ int
 default_policy_allow_subscribe(const struct GNUNET_SCRB_Policy* policy,
 	const struct GNUNET_PeerIdentity* source,
 	const struct GNUNET_CRYPTO_PublicKey* group_key,
+	const struct GNUNET_CONTAINER_MultiHashMap* groups,
 	const struct GNUNET_SCRB_Content* content,
 	void* cls)
 {
-	//TO-DO: implement the policy
+	//1. As the first condition check if our group is acked
+	struct 
 	return 1;
 };
 

@@ -89,9 +89,14 @@ struct GNUNET_SCRB_SubscribeAckMessage
    */
   struct GNUNET_SCRB_MessageHeader header;
   /**
-   * Path of the message
+   * Path to the root
    */
-  struct GNUNET_SCRB_RoutePath path;
+  struct GNUNET_SCRB_RoutePath path_to_root;
+
+  /**
+   * Path to the peer sending ack
+   */
+  struct GNUNET_SCRB_RoutePath path_to_ack;
 
   /**
    * The group for which the acknowledgement is sent
@@ -99,9 +104,15 @@ struct GNUNET_SCRB_SubscribeAckMessage
   struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 	
   /**
+   * Public group key hash
+   */	
+  struct GNUNET_HashCode grp_key_hash;
+	
+  /**
    * Source of the message
    */
   struct GNUNET_PeerIdentity source;
+
   /**
    * uinque id
    */
@@ -134,6 +145,16 @@ struct GNUNET_SCRB_AnycastMessage
    * Nodes the message is going to visit
    */
   struct GNUNET_SCRB_RoutePath to_visit;
+  
+	/**
+	 * The message origin
+	 */
+  struct GNUNET_PeerIdentity orig;
+  
+  /**
+   * Path to originator of the message
+   */
+  struct GNUNET_SCRB_RoutePath path_to_orig;
 		
 };
 
@@ -166,7 +187,7 @@ struct GNUNET_SCRB_SubscribeFailMessage
 	
 };
 
-struct GNUNET_SCRB_ClientSubscribeFailMessage
+struct GNUNET_SCRB_ClientSubscribeReplyMessage
 {
   /**
    * The message header
@@ -180,7 +201,7 @@ struct GNUNET_SCRB_ClientSubscribeFailMessage
 		
 };
 
-struct GNUNET_SCRB_ClientChildChangeEventMessage
+struct GNUNET_SCRB_ChildChangeEventMessage
 {
   /**
    * The message header
@@ -198,156 +219,6 @@ struct GNUNET_SCRB_ClientChildChangeEventMessage
   struct GNUNET_PeerIdentity child;	
 };
 
-struct GNUNET_SCRB_ClientConnectMessage
-{
-  struct GNUNET_SCRB_MessageHeader header;
-	
-};
-
-struct GNUNET_SCRB_ServiceCreateAck
-{
-  struct GNUNET_SCRB_MessageHeader header;
-  /**
-   * rendevouz point
-   */
-  struct GNUNET_PeerIdentity rp;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-};
-
-struct GNUNET_SCRB_ServiceCreateFail
-{
-  struct GNUNET_SCRB_MessageHeader header;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-};
-
-
-struct GNUNET_SCRB_ServiceReplySubscribe
-{
-  struct GNUNET_PeerIdentity pid;
-
-  struct GNUNET_MessageHeader header;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-  /**
-   * client id
-   */
-  struct GNUNET_HashCode cid;
-  /**
-   * status
-   */
-  unsigned int status;
-};
-
-
-struct GNUNET_SCRB_RegisterService
-{
-  struct GNUNET_MessageHeader header;
-  /**
-   * Publisher id
-   */
-  struct GNUNET_HashCode pid;
-};
-
-/**
- * Message for client requesting a service list
- */
-struct GNUNET_SCRB_ClntRqstSrvcLst
-{
-  struct GNUNET_MessageHeader header;
-
-  struct GNUNET_HashCode cid;
-};
-
-struct GNUNET_SCRB_SrvcRplySrvcLst
-{
-  struct GNUNET_MessageHeader header;
-
-  struct GNUNET_SCRB_ServicePublisher pub;
-
-  uint16_t size;
-};
-
-struct GNUNET_SCRB_ClntSbscrbRqst
-{
-  struct GNUNET_MessageHeader header;
-
-  struct GNUNET_HashCode group_id;
-
-  struct GNUNET_HashCode client_id;
-};
-
-struct GNUNET_SCRB_UpdateSubscriber
-{
-  struct GNUNET_MessageHeader header;
-
-  struct GNUNET_HashCode group_id;
-
-  struct GNUNET_SCRB_Content data;
-
-  int last;
-};
-
-struct GNUNET_SCRB_ClntRqstLv
-{
-  struct GNUNET_MessageHeader header;
-  /**
-   * Client id
-   */
-  struct GNUNET_HashCode cid;
-  /**
-   * Group id
-   */
-  struct GNUNET_HashCode group_id;
-};
-
-struct GNUNET_SCRB_ServiceReplyLeave
-{
-  struct GNUNET_MessageHeader header;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-  /**
-   * client id
-   */
-  struct GNUNET_HashCode cid;
-};
-
-struct GNUNET_SCRB_SendParent2Child
-{
-  struct GNUNET_MessageHeader header;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-  /**
-   * client id
-   */
-  struct GNUNET_PeerIdentity parent;
-
-  struct GNUNET_HashCode cid;
-};
-
-struct GNUNET_SCRB_SendLeaveToParent
-{
-  struct GNUNET_MessageHeader header;
-  /**
-   * group id
-   */
-  struct GNUNET_HashCode group_id;
-  /**
-   * client id
-   */
-  struct GNUNET_HashCode sid;
-};
 
 
 GNUNET_NETWORK_STRUCT_END

@@ -812,11 +812,41 @@ deliver (void *cls,
 	break;
   }
 }
+
 /**
- * Forwarding functionality for the join block which comes via DHT.
- *
+ * Operation result of the forwarding function
  */
-int
+enum FOpResult
+{
+  CHECK_FAIL, SUBSCRIBE_ACK, SUBSCRIBE_FAIL, WAIT_ACK, ANYCAST
+};
+
+/**
+ * Processes a join block which comes via DHT.
+ *
+ * f.1 group is created
+ *   f.1.1 check if the source node is already on the path
+ *   f.1.2 check if we already have the child
+ *   f.1.3 check if any of the children are on the path
+ *   f.1.4 if policy accepts
+ *     f.1.4.1 add child
+ *     f.1.4.2 send parent
+ *     f.1.4.3 if group is ack
+ *       f.1.4.3.1 send ack to node
+ *       f.1.4.3.2 update clients
+ *   f.1.5 policy does not accept
+ *     f.1.5.1 if group is ack
+ *       f.1.5.2 send anycast to children
+ * f.2 group is not created 
+ *   f.2.1 create group
+ *   f.2.2 if policy accepts node
+ *     f.2.2.1 add child
+ *     f.2.2.2 send parent
+ *   f.2.3 policy does not accept
+ *     f.2.3.1 send fail
+ *   
+ */
+uint8_t
 forward_join(const struct GNUNET_HashCode* key,
 			 const void* data,
 			 const struct GNUNET_PeerIdentity* path,
@@ -834,7 +864,7 @@ forward_join(const struct GNUNET_HashCode* key,
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Bypassing forward logic of subscribe message for group %s because local node is the subscriber's source.\n",
 				GNUNET_h2s (&join_bloch->gr_pub_key_hash));
-	return 1;
+	return CHECK_FAIL;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 			  "Handle forward subscribe message for group %s.\n",
@@ -865,10 +895,9 @@ forward_join(const struct GNUNET_HashCode* key,
   struct Group*
 	grp = GNUNET_CONTAINER_multihashmap_get (groups, gr_pub_key_hash);
 	
-  if(NULL != grp)
+  if(NULL != grp)//f.1
   {
-	//2. check if the source node is already on the path
-	//so we do not create loops
+	//f.1.1. check if the source node is already on the path
 	struct GNUNET_SCRB_RoutePath path_to_root = grp->path_to_root;
 	if(1 == check_path_contains(path_to_root->path, path_to_root->path_length, lp))
 	{
@@ -876,44 +905,69 @@ forward_join(const struct GNUNET_HashCode* key,
 				  "Rejecting subsribe message for group %s, the node %s is already on the path.\n",
 				  GNUNET_h2s (grp->pub_key_hash),
 				  GNUNET_h2s (lp_hash));
-	  return 1;
+	  return CHECK_FAIL;
 	}
 		
-	//3. Check if we already have the child
-	if(1 == group_children_contain(grp, lp)
+	//f.1.2. Check if we already have the child
+	if(1 == group_children_contain(grp, lp))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				  "The node %s is already in group %s.\n",
+				  GNUNET_h2s (lp_hash),
+				  GNUNET_h2s (grp->pub_key_hash));
+	  return CHECK_FAIL;
+	}
+	//f.1.3 check if any of the children are on the path
+	struct NodeList* nl = grp->nl_head;
+	while(NULL != nl)
+	{
+	  if(1 == check_path_contains(path, path_length, nl->node))
 	  {
 		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-					"The node %s is already in group %s.\n",
-					GNUNET_h2s (lp_hash),
-					GNUNET_h2s (grp->pub_key_hash));
-		return 0;
+					"Rejecting subsribe message for group %s, the child %s is already on the path.\n",
+					GNUNET_h2s (grp->pub_key_hash),
+					GNUNET_h2s (node->peer_hash));
+		return CHECK_FAIL;
 	  }
-	  }
-	
-	//4. check if our policy allows to take on the node
-	uint8_t implicit = 0;
+	  nl = nl->next;
+	}
+	//f.1.4  check if our policy allows to take on the node
 	if(NULL != policy->allow_subs_cb && 1 == policy->allow_subs_cb(policy, lp, grp_pub_key, content))
 	{
 	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				  "Hijacking subscribe message from %s to group %s.\n",
 				  GNUNET_h2s (lp_hash),
 				  GNUNET_h2s (grp->pub_key_hash));
+	  //f.1.4.1
 	  //here, provide the last on the path to build the group
-	  //if the last on the path is refused, it can be a relay for other nodes however
-	  if(NULL != (grp = group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp)))
+	  if(NULL != group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp))
 	  {
 		//the group was implicitly created
 		//send parent, do not send ack since the full
 		//path is not created, the message goes further
+		//f.1.4.2 send parent
 		cadet_send_parent (grp, lp);
-		implicit = 1;
-		return 1;
 	  }
-		
-	  cadet_send_subscribe_ack();
-	}else if(NULL != grp && 1 != implicit)// we send anycast to children only if we have the group already
-	{//and have not created it implicitly
+	  
+	  if(grp->is_acked)
+	  {
+		//f.1.4.3.1 send ack to node
+		cadet_send_subscribe_ack(lp,
+								 &join_block->src,
+								 path_to_root->path,
+								 path_to_root->path_length,
+								 path,
+								 path_length,
+								 0);//set offset to 0
+		//f.1.4.3.2 send child add to clients
+		client_send_child_change_event (grp, lp->peer, 1);
 
+		return SUBSCRIBE_ACK;
+	  }
+
+	}else if(1 == grp->is_acked)//f.1.5.(1) policy does not accept (group is acked)
+	{
+	  //f.1.5.2 send anycast to children
 	  struct GNUNET_SCRB_AnycastMessage* msg = GNUNET_malloc(*msg);
 	  msg->group_key = grp->pub_key;
 	  //send only to those that have been acked already
@@ -946,6 +1000,8 @@ forward_join(const struct GNUNET_HashCode* key,
 		cadet_send_subscribe_fail (node, source,
 								   path, path_length,
 								   0);//we send, no offset
+		return SUBSCRIBE_FAIL;
+
 	  }else
 	  {
 		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -954,15 +1010,15 @@ forward_join(const struct GNUNET_HashCode* key,
 					GNUNET_h2s (grp->pub_key_hash));
 		struct NodeHandle* handle = NULL;
 		if(NULL == (handle = group_children_get(grp, next)))
-		{
-		  //create a handle for the next peer
-		  handle = GNUNET_new (struct NodeHandle);
-		  handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
-		  handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
-		  GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
-		  memcpy(handle->peer, next, sizeof(*next));
-		  handle->ch = cadet_channel_create(grp, handle->peer);	
-		}
+		  {
+			//create a handle for the next peer
+			handle = GNUNET_new (struct NodeHandle);
+			handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+			handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
+			GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
+			memcpy(handle->peer, next, sizeof(*next));
+			handle->ch = cadet_channel_create(grp, handle->peer);	
+		  }
 		//our content is the join block
 		//copy the whole block to data
 		//change the source to the last path node
@@ -978,9 +1034,49 @@ forward_join(const struct GNUNET_HashCode* key,
 		memcpy(&msg->path_to_orig, path_to_orig, sizeof(*path_to_orig));
 		memcpcy(&msg->orig, &my_identity, sizeof(my_identity));
 		cadet_send_direct_anycast(msg, handle, policy);
+		return ANYCAST;
 	  }
 	}
+  }else
+  { //f.2 group is not created
+	
+	//f.2.1 if policy accepts the node
+	if(NULL != policy->allow_subs_cb && 1 == policy->allow_subs_cb(policy, lp, grp_pub_key, content))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				  "Hijacking subscribe message from %s to group %s.\n",
+				  GNUNET_h2s (lp_hash),
+				  GNUNET_h2s (grp->pub_key_hash));
+	  //f.2.2.1 add child
+	  //here, provide the last on the path to build the group
+	  if(NULL != (grp = group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp)))
+	  {
+		//the group was implicitly created
+		//send parent, do not send ack since the full
+		//path is not created, the message goes further
+		//f.2.2.2 send parent
+		cadet_send_parent (grp, lp);
+		return WAIT_ACK;
+	  }
+		
+	}else //f.2.3 policy does not accept
+	{
+	  //f.2.3.1 send fail
+	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				  "Anycast fail to group %s.\n",
+				  GNUNET_h2s (grp->pub_key_hash));
+		
+	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				  "Sending subsribe fail message to %s for group %s.\n",
+				  GNUNET_h2s (lp_hash),
+				  GNUNET_h2s (grp->pub_key_hash));
+
+	  cadet_send_subscribe_fail (lp, source,
+								 path, path_length,
+								 0);//we send, no offset
+	}
   }
+}
 
 /**
  * Checks if the @a path contains @a node
@@ -1749,11 +1845,26 @@ forward_join(const struct GNUNET_HashCode* key,
 	{
 	  //we have received the join block
 	  struct GNUNET_BLOCK_SCRB_Join* join_block = (struct GNUNET_BLOCK_SCRB_Join*)content->data;
-	  
+	  struct GNUNET_SCRB_RoutePath path_to_orig;
+	  memcpy(&path, &msg->path_to_orig, sizeof(msg->path_to_orig));
+	  //create a handle for the subscribing node
+	  struct GNUNET_PeerIdentity* path = path_to_orig->path;
+	  unsigned int path_length = path_to_orig->path_length;
+	  struct GNUNET_PeerIdentity* lp = &path[path_length - 1];
+	  struct GNUNET_HashCode* lp_hash = GNUNET_malloc(sizeof(*lp_hash));
+	  //hash of the  last peer
+	  GNUNET_CRYPTO_Hash (lp, sizeof(*lp), lp_hash);
+
+	  //create a handle for the node
+	  struct NodeHandle* node = GNUNET_new (struct NodeHandle);
+	  node->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+	  node->peer_hash = lp_hash;
+	  memcpy(node->peer, lp, sizeof(*lp));
+	  node->ch = cadet_channel_create(grp, node->peer);
+
 	  //we have received back our anycast
 	  if(0 == memcmp(&msg->orig, &my_identity, sizeof(my_identity)))
-	  {
-		
+	  {		
 		struct GNUNET_PeerIdentity* next = NULL;
 		if(NULL != policy->get_next_anycst_cb)
 		  next = policy->get_next_anycst_cb(policy, msg, NULL);
@@ -1768,7 +1879,7 @@ forward_join(const struct GNUNET_HashCode* key,
 					  GNUNET_h2s (lp_hash),
 					  GNUNET_h2s (grp->pub_key_hash));
 
-		  cadet_send_subscribe_fail (node, source,
+		  cadet_send_subscribe_fail (node, &join_block->src,
 									 path, path_length,
 									 0);//we send, no offset
 		}else
@@ -1788,13 +1899,17 @@ forward_join(const struct GNUNET_HashCode* key,
 			memcpy(handle->peer, next, sizeof(*next));
 			handle->ch = cadet_channel_create(grp, handle->peer);	
 		  }
-		  //our content is the join block
-		  //copy the whole block to data
-		  size_t size = sizeof(*data);
-		  memcpy(&msg.content.data, data, size);
-		  msg.content.data_size = size;
+		  //copy the contents of the message and send it to another
+		  //recipient
+		  struct GNUNET_SCRB_AnycastMessage* new_msg = GNUNET_malloc(sizeof(*new_msg));
+		  memcpy(new_msg, msg, sizeof(msg));
 		  cadet_send_direct_anycast(&my_identity, msg, handle, policy);
 		}
+	  }else
+	  {
+		  //we are not the message originator
+		  //we do the same checks to subscribe the node
+	  
 	  }
 
 	
@@ -2421,7 +2536,7 @@ forward_join(const struct GNUNET_HashCode* key,
 	  if(0 == memcmp(nl->node->peer, child, sizeof(*child)))
 		return 1;
 	  nl = nl->next;
-	};
+	}
 	return 0;
   };
 
@@ -2536,7 +2651,7 @@ forward_join(const struct GNUNET_HashCode* key,
 
 /**
  * Helper to add children to a group with the provided @a grp_pub_key
- * @return a newly created group, in case of implicit subscribe, otherwise NULL
+ * @return grp or NULL on failure
  */
   static int
 	group_child_add_helper(const struct GNUNET_SCRB_Policy* policy,
@@ -2561,17 +2676,15 @@ forward_join(const struct GNUNET_HashCode* key,
 	  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				  "implicitly subscribing to group %s.\n",
 				  GNUNET_h2s (grp_key_hash));
-	  ret = grp;
 	}
+	
+	ret = grp;
 	
 	group_children_add(grp, child);
 	
 	if(NULL != policy->child_added_cb)
 	  policy->child_added_cb(policy, child);
 	
-	client_send_child_change_event(grp,
-								   child->peer,
-								   GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);
 	return ret;
   };
 

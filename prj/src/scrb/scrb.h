@@ -82,6 +82,55 @@ struct GNUNET_SCRB_SubscribeParentMessage
   struct GNUNET_HashCode grp_key_hash;
 };
 
+/**
+ *  Envelope for subscribe ack/fail messages
+ */
+struct GNUNET_SCRB_DownStreamMessage
+{
+  /**
+   * The message header
+   */
+  struct GNUNET_SCRB_MessageHeader header;
+  
+  /**
+   * The group the message is propagated
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
+    
+  /**
+   * The source address
+   */
+  struct GNUNET_PeerIdentity src;
+  
+  /**
+   * The next peer
+   */
+  struct GNUNET_PeerIdentity next;
+  
+  /**
+   * The destination address
+   */
+  struct GNUNET_PeerIdentity dst; 
+
+  /**
+   * Path to the destination beginning from the source
+   */
+  struct GNUNET_SCRB_RoutePath path;
+	
+  /**
+   * Content of the downstream message
+   */	
+  struct GNUNET_SCRB_Content content;
+  
+  /**
+   * uinque id
+   */
+  struct GNUNET_HashCode id;
+};
+
+/**
+ * Subscribe ack message
+ */
 struct GNUNET_SCRB_SubscribeAckMessage
 {
   /**
@@ -89,20 +138,15 @@ struct GNUNET_SCRB_SubscribeAckMessage
    */
   struct GNUNET_SCRB_MessageHeader header;
   /**
-   * Path to the root
+   * Path to the root of the group
    */
   struct GNUNET_SCRB_RoutePath path_to_root;
-
-  /**
-   * Path to the peer sending ack
-   */
-  struct GNUNET_SCRB_RoutePath path_to_ack;
 
   /**
    * The group for which the acknowledgement is sent
    */
   struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
-	
+  
   /**
    * Public group key hash
    */	
@@ -111,13 +155,31 @@ struct GNUNET_SCRB_SubscribeAckMessage
   /**
    * Source of the message
    */
-  struct GNUNET_PeerIdentity source;
-
-  /**
-   * uinque id
-   */
-  uint64_t id;
+  struct GNUNET_PeerIdentity requestor;
 };
+
+/**
+ * Subscribe fail message
+ */
+struct GNUNET_SCRB_SubscribeFailMessage
+{
+  /**
+   * The message header
+   */
+  struct GNUNET_SCRB_MessageHeader header;
+	
+  /**
+   * Public key of the group
+   */	
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
+	
+  /**
+   * Public group key hash
+   */	
+  struct GNUNET_HashCode grp_key_hash;
+	
+};
+
 
 struct GNUNET_SCRB_AnycastMessage
 {
@@ -155,49 +217,6 @@ struct GNUNET_SCRB_AnycastMessage
    * Path to originator of the message
    */
   struct GNUNET_SCRB_RoutePath path_to_orig;
-		
-};
-
-struct GNUNET_SCRB_SubscribeFailMessage
-{
-  /**
-   * The message header
-   */
-  struct GNUNET_SCRB_MessageHeader header;
-
-  /**
-   * The source address
-   */
-  struct GNUNET_PeerIdentity source;
-
-  /**
-   * Path to the member the subscription failed
-   */
-  struct GNUNET_SCRB_RoutePath path_to_failed;
-	
-  /**
-   * Public key of the group
-   */	
-  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
-	
-  /**
-   * Public group key hash
-   */	
-  struct GNUNET_HashCode grp_key_hash;
-	
-};
-
-struct GNUNET_SCRB_ClientSubscribeReplyMessage
-{
-  /**
-   * The message header
-   */
-  struct GNUNET_SCRB_MessageHeader header;
-
-  /**
-   * Public key of the group
-   */	
-  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
 		
 };
 

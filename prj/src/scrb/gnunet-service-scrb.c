@@ -224,8 +224,6 @@ struct Group
   uint8_t is_root;
   //if we are acked
   uint8_t is_acked;
-  //if we are a relay node
-  uint8_t is_relay;
 
   uint8_t disconnected;
 };
@@ -336,6 +334,11 @@ group_child_add_helper(const struct GNUNET_SCRB_Policy* policy,
 					   const struct GNUNET_CRYPTO_PublicKey* grp_key,
 					   const struct GNUNET_HashCode* grp_key_hash,
 					   struct NodeHandle* child);
+/**
+ * Extracts the next on the path for the downstream message
+ */
+struct NodeHandle*
+dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg);
 
 struct Client
 {
@@ -360,8 +363,6 @@ struct Channel
 {
   /**
    * Group the channel belongs to
-   *
-   * Only set for outgoing channels
    */
   struct Group* grp;
 	
@@ -382,7 +383,7 @@ struct Channel
   /**
    * Remote peer identity
    */
-  struct GNUNET_PeerIdentity peer;
+  struct GNUNET_PeerIdentity* peer;
 	
   /**
    * Channel direction
@@ -392,6 +393,10 @@ struct Channel
 };
 
 static struct GNUNET_CONTAINER_MultiHashMap *groups;
+
+static struct GNUNET_CONTAINER_MultiHashMap *channels_in;
+
+static struct GNUNET_CONTAINER_MultiHashMap *channels_out;
 
 static struct GNUNET_CONTAINER_MultiHashMap *publishers;
 
@@ -858,7 +863,7 @@ forward_join(const struct GNUNET_HashCode* key,
 	join_block = (struct GNUNET_BLOCK_SCRB_Join*) data;
   //FIXME: do all the necessary security checks
 
-  //1. check if this is our subscribe message then ignore it
+  //check if this is our subscribe message then ignore it
   if(0 == memcmp(&join_block->src, &my_identity, sizeof(struct GNUNET_HashCode)))
   {
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -893,7 +898,7 @@ forward_join(const struct GNUNET_HashCode* key,
   memcpy(&grp_pub_key_hash, sizeof(grp_pub_key_hash), &join_block->grp_pub_key_hash);
 	
   struct Group*
-	grp = GNUNET_CONTAINER_multihashmap_get (groups, gr_pub_key_hash);
+	grp =GNUNET_CONTAINER_multihashmap_get (groups, gr_pub_key_hash);
 	
   if(NULL != grp)//f.1
   {
@@ -1010,15 +1015,15 @@ forward_join(const struct GNUNET_HashCode* key,
 					GNUNET_h2s (grp->pub_key_hash));
 		struct NodeHandle* handle = NULL;
 		if(NULL == (handle = group_children_get(grp, next)))
-		  {
-			//create a handle for the next peer
-			handle = GNUNET_new (struct NodeHandle);
-			handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
-			handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
-			GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
-			memcpy(handle->peer, next, sizeof(*next));
-			handle->ch = cadet_channel_create(grp, handle->peer);	
-		  }
+		{
+		  //create a handle for the next peer
+		  handle = GNUNET_new (struct NodeHandle);
+		  handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+		  handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
+		  GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
+		  memcpy(handle->peer, next, sizeof(*next));
+		  handle->ch = cadet_channel_create(grp, handle->peer);	
+		}
 		//our content is the join block
 		//copy the whole block to data
 		//change the source to the last path node
@@ -1085,46 +1090,46 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param node        Identity of the peer to be checked
  * @return 0 in case the node is not on the path, 1 otherwise
  */
-  int
-	check_path_contains(struct GNUNET_PeerIdentity* path,
-						unsigned int path_length,
-						struct GNUNET_PeerIdentity* node)
-  {
-	int i;
-	for(i = 0; i < path_length; i++)
-	  if(0 == memcmp(&path[i], node, sizeof(struct GNUNET_HashCode)))
-		return 1;
-	return 0;
-  }
+int
+check_path_contains(struct GNUNET_PeerIdentity* path,
+					unsigned int path_length,
+					struct GNUNET_PeerIdentity* node)
+{
+  int i;
+  for(i = 0; i < path_length; i++)
+	if(0 == memcmp(&path[i], node, sizeof(struct GNUNET_HashCode)))
+	  return 1;
+  return 0;
+}
 
-  void
-	forward (void *cls,
-			 enum GNUNET_BLOCK_Type type,
-			 unsigned int path_length,
-			 const struct GNUNET_PeerIdentity *path,
-			 const struct GNUNET_HashCode *key,
-			 const void *data,
-			 size_t size)
+void
+forward (void *cls,
+		 enum GNUNET_BLOCK_Type type,
+		 unsigned int path_length,
+		 const struct GNUNET_PeerIdentity *path,
+		 const struct GNUNET_HashCode *key,
+		 const void *data,
+		 size_t size)
+{
+  switch (type) {
+  case GNUNET_BLOCK_SCRB_TYPE_JOIN:
   {
-	switch (type) {
-	case GNUNET_BLOCK_SCRB_TYPE_JOIN:
-	{
-	  forward_join(key, data, path, path_length, scrb_stats, groups);
-	  break;
-	}
-	case GNUNET_BLOCK_SCRB_TYPE_LEAVE:
-	{
-	  GNUNET_STATISTICS_update (scrb_stats,
-								gettext_noop ("# forward: LEAVE messages received"),
-								1, GNUNET_NO);
-	  struct GNUNET_BLOCK_SCRB_Leave* leave_block;
-	  leave_block = (struct GNUNET_BLOCK_SCRB_Leave*) data;
-	  struct GNUNET_HashCode sid = leave_block->sid;
-	  leaveGroup(key, &sid, groups, parents);
-	  break;
-	}
-	}
+	forward_join(key, data, path, path_length, scrb_stats, groups);
+	break;
   }
+  case GNUNET_BLOCK_SCRB_TYPE_LEAVE:
+  {
+	GNUNET_STATISTICS_update (scrb_stats,
+							  gettext_noop ("# forward: LEAVE messages received"),
+							  1, GNUNET_NO);
+	struct GNUNET_BLOCK_SCRB_Leave* leave_block;
+	leave_block = (struct GNUNET_BLOCK_SCRB_Leave*) data;
+	struct GNUNET_HashCode sid = leave_block->sid;
+	leaveGroup(key, &sid, groups, parents);
+	break;
+  }
+  }
+}
 
 /**
  * To be called on core init/fail.
@@ -1132,178 +1137,178 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param cls service closure
  * @param identity the public identity of this peer
  */
-  static void
-	core_init (void *cls,
-			   const struct GNUNET_PeerIdentity *identity)
-  {
-	my_identity = *identity;
-	GNUNET_CRYPTO_hash (identity,
-						sizeof (struct GNUNET_PeerIdentity),
-						&my_identity_hash);
+static void
+core_init (void *cls,
+		   const struct GNUNET_PeerIdentity *identity)
+{
+  my_identity = *identity;
+  GNUNET_CRYPTO_hash (identity,
+					  sizeof (struct GNUNET_PeerIdentity),
+					  &my_identity_hash);
 
-	mq = GNUNET_CORE_mq_create (core_api, identity);
+  mq = GNUNET_CORE_mq_create (core_api, identity);
 
-  }
+}
 
-  static void
-	handle_core_connect (void *cls, const struct GNUNET_PeerIdentity *peer)
-  {
-	printf("handle core connect ... \n");
-  }
+static void
+handle_core_connect (void *cls, const struct GNUNET_PeerIdentity *peer)
+{
+  printf("handle core connect ... \n");
+}
 
-  static void
-	handle_core_disconnect (void *cls, const struct GNUNET_PeerIdentity *peer)
-  {
-	printf("handle core disconnect ... \n");
-  }
+static void
+handle_core_disconnect (void *cls, const struct GNUNET_PeerIdentity *peer)
+{
+  printf("handle core disconnect ... \n");
+}
 
-  static int
-	handle_service_confirm_leave (void *cls,
-								  const struct GNUNET_PeerIdentity *other,
-								  const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_ServiceReplyLeave *hdr;
-	hdr = (struct GNUNET_SCRB_ServiceReplyLeave *) message;
+static int
+handle_service_confirm_leave (void *cls,
+							  const struct GNUNET_PeerIdentity *other,
+							  const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_ServiceReplyLeave *hdr;
+  hdr = (struct GNUNET_SCRB_ServiceReplyLeave *) message;
 
-	struct GNUNET_HashCode sub_hash;
-	GNUNET_CRYPTO_hkdf (&sub_hash, sizeof (struct GNUNET_HashCode),
-						GCRY_MD_SHA512, GCRY_MD_SHA256,
-						&hdr->cid, sizeof (struct GNUNET_HashCode),
-						&hdr->group_id, sizeof (struct GNUNET_HashCode),
-						NULL, 0);
-	struct GNUNET_SCRB_ServiceSubscriber* sub ;
-	sub = GNUNET_CONTAINER_multihashmap_get(subscribers, &sub_hash);
-	GNUNET_CONTAINER_multihashmap_remove(subscribers, &sub_hash, sub);
-	GNUNET_free(sub);
-	return GNUNET_OK;
-  }
+  struct GNUNET_HashCode sub_hash;
+  GNUNET_CRYPTO_hkdf (&sub_hash, sizeof (struct GNUNET_HashCode),
+					  GCRY_MD_SHA512, GCRY_MD_SHA256,
+					  &hdr->cid, sizeof (struct GNUNET_HashCode),
+					  &hdr->group_id, sizeof (struct GNUNET_HashCode),
+					  NULL, 0);
+  struct GNUNET_SCRB_ServiceSubscriber* sub ;
+  sub = GNUNET_CONTAINER_multihashmap_get(subscribers, &sub_hash);
+  GNUNET_CONTAINER_multihashmap_remove(subscribers, &sub_hash, sub);
+  GNUNET_free(sub);
+  return GNUNET_OK;
+}
 
-  static int
-	handle_service_confirm_creation (void *cls,
+static int
+handle_service_confirm_creation (void *cls,
+								 const struct GNUNET_PeerIdentity *other,
+								 const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_ServiceReplyCreate *hdr;
+  hdr = (struct GNUNET_SCRB_ServiceReplyCreate *) message;
+
+  struct ClientEntry *ce;
+  ce = GNUNET_CONTAINER_multihashmap_get(clients, &hdr->cid);
+
+  struct GNUNET_SCRB_ServicePublisher* pub = GNUNET_new(struct GNUNET_SCRB_ServicePublisher);
+
+  pub->rp = hdr->rp;
+  pub->group_id = *ce->cid;
+  GNUNET_CONTAINER_multihashmap_put(publishers,
+									&pub->group_id,
+									pub,
+									GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE );
+
+  struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(hdr, GNUNET_MESSAGE_TYPE_SCRB_CREATE_REPLY);
+
+  GNUNET_MQ_send (ce->mq, ev);
+
+  return GNUNET_OK;
+}
+
+static int handle_service_confirm_subscription (
+  void *cls,
+  const struct GNUNET_PeerIdentity *other,
+  const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_SendParent2Child *hdr;
+  hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
+
+  struct GNUNET_SCRB_ServiceSubscription* subs = GNUNET_new (struct GNUNET_SCRB_ServiceSubscription);
+
+  struct GNUNET_SCRB_ServiceSubscriber* sub = GNUNET_new(struct GNUNET_SCRB_ServiceSubscriber);
+
+  subs->group_id = hdr->group_id;
+  sub->group_id = hdr->group_id;
+  sub->cid = hdr->cid;
+
+  GNUNET_CONTAINER_DLL_insert(subs->sub_head, subs->sub_tail, sub);
+
+  GNUNET_CONTAINER_multihashmap_put(subscribers,
+									&subs->group_id,
+									subs,
+									GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY );
+
+  send_subscribe_confirmation(sub, clients);
+
+  return GNUNET_OK;
+}
+
+static int handle_service_multicast (
+  void *cls,
+  const struct GNUNET_PeerIdentity *other,
+  const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_UpdateSubscriber *hdr;
+  hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
+
+  const char* msg = "# handle: MULTICAST messages received from: ";
+  update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
+  GNUNET_STATISTICS_update (scrb_stats,
+							gettext_noop ("# handle: overall MULTICAST messages received"),
+							1, GNUNET_NO);
+
+  struct GNUNET_BLOCK_SCRB_Multicast mb;
+
+  mb.data = hdr->data;
+  mb.group_id = hdr->group_id;
+  mb.last = hdr->last;
+
+  //	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
+  //
+  //	service_send_multicast_to_parent(parent, hdr);
+
+  receive_multicast(&hdr->group_id, &my_identity, other, groups, &mb, subscribers, clients);
+
+  return GNUNET_OK;
+}
+
+
+static int
+handle_service_send_parent (void *cls,
+							const struct GNUNET_PeerIdentity *other,
+							const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_SendParent2Child *hdr;
+  hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
+
+  const char* msg = "# service: SEND PARENT messages received from: ";
+  update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
+
+  struct GNUNET_SCRB_GroupParent* parent = GNUNET_new(struct GNUNET_SCRB_GroupParent);
+
+  parent->group_id = hdr->group_id;
+
+  parent->parent = hdr->parent;
+
+  parent->mq = GNUNET_CORE_mq_create (core_api, &parent->parent);
+
+  GNUNET_CONTAINER_multihashmap_put(parents,
+									&parent->group_id,
+									parent,
+									GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY );
+
+  handle_service_confirm_subscription(cls, other, message);
+
+  return GNUNET_OK;
+}
+
+static int
+handle_service_send_leave_to_parent (void *cls,
 									 const struct GNUNET_PeerIdentity *other,
 									 const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_ServiceReplyCreate *hdr;
-	hdr = (struct GNUNET_SCRB_ServiceReplyCreate *) message;
+{
+  struct GNUNET_SCRB_SendLeaveToParent *hdr;
+  hdr = (struct GNUNET_SCRB_SendLeaveToParent *) message;
 
-	struct ClientEntry *ce;
-	ce = GNUNET_CONTAINER_multihashmap_get(clients, &hdr->cid);
+  leaveGroup(&hdr->group_id, &hdr->sid, groups, parents);
 
-	struct GNUNET_SCRB_ServicePublisher* pub = GNUNET_new(struct GNUNET_SCRB_ServicePublisher);
-
-	pub->rp = hdr->rp;
-	pub->group_id = *ce->cid;
-	GNUNET_CONTAINER_multihashmap_put(publishers,
-									  &pub->group_id,
-									  pub,
-									  GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE );
-
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(hdr, GNUNET_MESSAGE_TYPE_SCRB_CREATE_REPLY);
-
-	GNUNET_MQ_send (ce->mq, ev);
-
-	return GNUNET_OK;
-  }
-
-  static int handle_service_confirm_subscription (
-	void *cls,
-	const struct GNUNET_PeerIdentity *other,
-	const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_SendParent2Child *hdr;
-	hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
-
-	struct GNUNET_SCRB_ServiceSubscription* subs = GNUNET_new (struct GNUNET_SCRB_ServiceSubscription);
-
-	struct GNUNET_SCRB_ServiceSubscriber* sub = GNUNET_new(struct GNUNET_SCRB_ServiceSubscriber);
-
-	subs->group_id = hdr->group_id;
-	sub->group_id = hdr->group_id;
-	sub->cid = hdr->cid;
-
-	GNUNET_CONTAINER_DLL_insert(subs->sub_head, subs->sub_tail, sub);
-
-	GNUNET_CONTAINER_multihashmap_put(subscribers,
-									  &subs->group_id,
-									  subs,
-									  GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY );
-
-	send_subscribe_confirmation(sub, clients);
-
-	return GNUNET_OK;
-  }
-
-  static int handle_service_multicast (
-	void *cls,
-	const struct GNUNET_PeerIdentity *other,
-	const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_UpdateSubscriber *hdr;
-	hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
-
-	const char* msg = "# handle: MULTICAST messages received from: ";
-	update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
-	GNUNET_STATISTICS_update (scrb_stats,
-							  gettext_noop ("# handle: overall MULTICAST messages received"),
-							  1, GNUNET_NO);
-
-	struct GNUNET_BLOCK_SCRB_Multicast mb;
-
-	mb.data = hdr->data;
-	mb.group_id = hdr->group_id;
-	mb.last = hdr->last;
-
-	//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
-	//
-	//	service_send_multicast_to_parent(parent, hdr);
-
-	receive_multicast(&hdr->group_id, &my_identity, other, groups, &mb, subscribers, clients);
-
-	return GNUNET_OK;
-  }
-
-
-  static int
-	handle_service_send_parent (void *cls,
-								const struct GNUNET_PeerIdentity *other,
-								const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_SendParent2Child *hdr;
-	hdr = (struct GNUNET_SCRB_SendParent2Child *) message;
-
-	const char* msg = "# service: SEND PARENT messages received from: ";
-	update_stats(msg, other, &my_identity, &hdr->group_id, scrb_stats);
-
-	struct GNUNET_SCRB_GroupParent* parent = GNUNET_new(struct GNUNET_SCRB_GroupParent);
-
-	parent->group_id = hdr->group_id;
-
-	parent->parent = hdr->parent;
-
-	parent->mq = GNUNET_CORE_mq_create (core_api, &parent->parent);
-
-	GNUNET_CONTAINER_multihashmap_put(parents,
-									  &parent->group_id,
-									  parent,
-									  GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY );
-
-	handle_service_confirm_subscription(cls, other, message);
-
-	return GNUNET_OK;
-  }
-
-  static int
-	handle_service_send_leave_to_parent (void *cls,
-										 const struct GNUNET_PeerIdentity *other,
-										 const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_SendLeaveToParent *hdr;
-	hdr = (struct GNUNET_SCRB_SendLeaveToParent *) message;
-
-	leaveGroup(&hdr->group_id, &hdr->sid, groups, parents);
-
-	return GNUNET_OK;
-  }
+  return GNUNET_OK;
+}
 
 
 
@@ -1312,283 +1317,283 @@ forward_join(const struct GNUNET_HashCode* key,
 /**
  * Connect to the core service
  */
-  int
-	p2p_init ()
+int
+p2p_init ()
+{
+  static struct GNUNET_CORE_MessageHandler core_handlers[] = {
+	{&handle_service_confirm_creation, GNUNET_MESSAGE_TYPE_SCRB_CREATE_REPLY, 0},
+	{&handle_service_confirm_subscription, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY, 0},
+	{&handle_service_confirm_leave, GNUNET_MESSAGE_TYPE_SCRB_LEAVE_REPLY, 0},
+	{&handle_service_send_parent, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT, 0},
+	{&handle_service_send_leave_to_parent, GNUNET_MESSAGE_TYPE_SCRB_SEND_LEAVE_TO_PARENT, 0},
+	{&handle_service_multicast, GNUNET_MESSAGE_TYPE_SCRB_MULTICAST, 0},
+	{NULL, 0, 0}
+  };
+
+  core_api =
+	GNUNET_CORE_connect (cfg,
+						 NULL,
+						 &core_init,
+						 &handle_core_connect,
+						 &handle_core_disconnect,
+						 NULL,
+						 GNUNET_NO,
+						 NULL,
+						 GNUNET_NO,
+						 core_handlers);
+  if (core_api == NULL)
+	return GNUNET_SYSERR;
+
+  return GNUNET_OK;
+}
+
+static void
+handle_cl_multicast_request (void *cls,
+							 struct GNUNET_SERVER_Client *client,
+							 const struct GNUNET_MessageHeader *message)
+{
+
+  struct ClientEntry* ce;
+  if((ce = make_client_entry (client)) == NULL)
+	return;
+
+  struct GNUNET_SCRB_UpdateSubscriber *hdr;
+  hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
+
+  struct GNUNET_BLOCK_SCRB_Multicast multicast_block;
+
+  memcpy(&multicast_block.data, &hdr->data, sizeof(struct GNUNET_SCRB_MulticastData));
+  multicast_block.group_id = ce->cid;
+  multicast_block.last = hdr->last;
+
+  //	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
+  //
+  //	service_send_multicast_to_parent(parent, hdr);
+  //
+  //	receive_multicast(&hdr->group_id, &my_identity_hash, NULL, groups, &multicast_block, subscribers, clients);
+
+  put_dht_handle = GNUNET_DHT_put (dht_handle, &hdr->group_id, 1,
+								   GNUNET_DHT_RO_RECORD_ROUTE |
+								   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+								   GNUNET_BLOCK_SCRB_TYPE_MULTICAST,
+								   sizeof (multicast_block), &multicast_block,
+								   GNUNET_TIME_UNIT_FOREVER_ABS,
+								   GNUNET_TIME_UNIT_FOREVER_REL,
+								   NULL, NULL);
+
+  if(NULL == put_dht_handle)
+	GNUNET_break(0);
+
+  GNUNET_SERVER_receive_done (client, GNUNET_OK);
+
+}
+
+void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
+								 struct GNUNET_CONTAINER_MultiHashMap* clients) {
+  struct GNUNET_SCRB_ServiceReplySubscribe *msg;
+  struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY);
+  size_t msg_size = sizeof(struct GNUNET_SCRB_ServiceReplySubscribe);
+  msg->header.size = htons((uint16_t) msg_size);
+  msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY);
+  msg->cid = sub->cid;
+  msg->group_id = sub->group_id;
+  struct ClientEntry* ce = GNUNET_CONTAINER_multihashmap_get(clients,
+															 &sub->cid);
+  if(NULL != ce)
+	GNUNET_MQ_send(ce->mq, ev);
+}
+
+static void
+handle_cl_subscribe_request (void *cls,
+							 struct GNUNET_SERVER_Client *client,
+							 const struct GNUNET_MessageHeader *message)
+{
+  struct ClientEntry* ce;
+  if((ce = make_client_entry (client)) == NULL)
+	return;
+
+  struct GNUNET_SCRB_ServiceSubscription* subs;
+  subs = 	GNUNET_CONTAINER_multihashmap_get(subscribers, &ce->cid);
+
+  if(subs == NULL)
   {
-	static struct GNUNET_CORE_MessageHandler core_handlers[] = {
-	  {&handle_service_confirm_creation, GNUNET_MESSAGE_TYPE_SCRB_CREATE_REPLY, 0},
-	  {&handle_service_confirm_subscription, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY, 0},
-	  {&handle_service_confirm_leave, GNUNET_MESSAGE_TYPE_SCRB_LEAVE_REPLY, 0},
-	  {&handle_service_send_parent, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT, 0},
-	  {&handle_service_send_leave_to_parent, GNUNET_MESSAGE_TYPE_SCRB_SEND_LEAVE_TO_PARENT, 0},
-	  {&handle_service_multicast, GNUNET_MESSAGE_TYPE_SCRB_MULTICAST, 0},
-	  {NULL, 0, 0}
-	};
+	struct GNUNET_BLOCK_SCRB_Join join_block;
 
-	core_api =
-	  GNUNET_CORE_connect (cfg,
-						   NULL,
-						   &core_init,
-						   &handle_core_connect,
-						   &handle_core_disconnect,
-						   NULL,
-						   GNUNET_NO,
-						   NULL,
-						   GNUNET_NO,
-						   core_handlers);
-	if (core_api == NULL)
-	  return GNUNET_SYSERR;
+	join_block.cid = hdr->client_id;
+	join_block.sid = my_identity;
 
-	return GNUNET_OK;
-  }
-
-  static void
-	handle_cl_multicast_request (void *cls,
-								 struct GNUNET_SERVER_Client *client,
-								 const struct GNUNET_MessageHeader *message)
-  {
-
-	struct ClientEntry* ce;
-	if((ce = make_client_entry (client)) == NULL)
-	  return;
-
-	struct GNUNET_SCRB_UpdateSubscriber *hdr;
-	hdr = (struct GNUNET_SCRB_UpdateSubscriber *) message;
-
-	struct GNUNET_BLOCK_SCRB_Multicast multicast_block;
-
-	memcpy(&multicast_block.data, &hdr->data, sizeof(struct GNUNET_SCRB_MulticastData));
-	multicast_block.group_id = ce->cid;
-	multicast_block.last = hdr->last;
-
-	//	struct GNUNET_SCRB_GroupParent* parent = GNUNET_CONTAINER_multihashmap_get(parents, &hdr->group_id);
-	//
-	//	service_send_multicast_to_parent(parent, hdr);
-	//
-	//	receive_multicast(&hdr->group_id, &my_identity_hash, NULL, groups, &multicast_block, subscribers, clients);
+	/* fixme: do not ignore return handles */
 
 	put_dht_handle = GNUNET_DHT_put (dht_handle, &hdr->group_id, 1,
 									 GNUNET_DHT_RO_RECORD_ROUTE |
 									 GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-									 GNUNET_BLOCK_SCRB_TYPE_MULTICAST,
-									 sizeof (multicast_block), &multicast_block,
+									 GNUNET_BLOCK_SCRB_TYPE_JOIN,
+									 sizeof (join_block), &join_block,
 									 GNUNET_TIME_UNIT_FOREVER_ABS,
 									 GNUNET_TIME_UNIT_FOREVER_REL,
 									 NULL, NULL);
 
 	if(NULL == put_dht_handle)
 	  GNUNET_break(0);
+	/* code with get handle
+	   get_dht_handle = GNUNET_DHT_get_start (dht_handle,
+	   GNUNET_BLOCK_SCRB_TYPE_CREATE,
+	   &hdr->group_id,
+	   1,
+	   GNUNET_DHT_RO_RECORD_ROUTE |
+	   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+	   NULL,
+	   0,
+	   &dht_get_join_handler, NULL);
+	*/
 
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
-
-  }
-
-  void send_subscribe_confirmation(struct GNUNET_SCRB_ServiceSubscriber* sub,
-								   struct GNUNET_CONTAINER_MultiHashMap* clients) {
-	struct GNUNET_SCRB_ServiceReplySubscribe *msg;
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY);
-	size_t msg_size = sizeof(struct GNUNET_SCRB_ServiceReplySubscribe);
-	msg->header.size = htons((uint16_t) msg_size);
-	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_REPLY);
-	msg->cid = sub->cid;
-	msg->group_id = sub->group_id;
-	struct ClientEntry* ce = GNUNET_CONTAINER_multihashmap_get(clients,
-															   &sub->cid);
-	if(NULL != ce)
-	  GNUNET_MQ_send(ce->mq, ev);
-  }
-
-  static void
-	handle_cl_subscribe_request (void *cls,
-								 struct GNUNET_SERVER_Client *client,
-								 const struct GNUNET_MessageHeader *message)
+  }else
   {
-	struct ClientEntry* ce;
-	if((ce = make_client_entry (client)) == NULL)
-	  return;
 
-	struct GNUNET_SCRB_ServiceSubscription* subs;
-	subs = 	GNUNET_CONTAINER_multihashmap_get(subscribers, &ce->cid);
+	struct GNUNET_SCRB_ServiceSubscriber *sub = GNUNET_new(struct GNUNET_SCRB_ServiceSubscriber);
 
-	if(subs == NULL)
-	{
-	  struct GNUNET_BLOCK_SCRB_Join join_block;
+	sub->group_id = hdr->group_id;
+	sub->cid = hdr->client_id;
 
-	  join_block.cid = hdr->client_id;
-	  join_block.sid = my_identity;
+	GNUNET_CONTAINER_DLL_insert(subs->sub_head, subs->sub_tail, sub);
 
-	  /* fixme: do not ignore return handles */
-
-	  put_dht_handle = GNUNET_DHT_put (dht_handle, &hdr->group_id, 1,
-									   GNUNET_DHT_RO_RECORD_ROUTE |
-									   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-									   GNUNET_BLOCK_SCRB_TYPE_JOIN,
-									   sizeof (join_block), &join_block,
-									   GNUNET_TIME_UNIT_FOREVER_ABS,
-									   GNUNET_TIME_UNIT_FOREVER_REL,
-									   NULL, NULL);
-
-	  if(NULL == put_dht_handle)
-		GNUNET_break(0);
-	  /* code with get handle
-		 get_dht_handle = GNUNET_DHT_get_start (dht_handle,
-		 GNUNET_BLOCK_SCRB_TYPE_CREATE,
-		 &hdr->group_id,
-		 1,
-		 GNUNET_DHT_RO_RECORD_ROUTE |
-		 GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-		 NULL,
-		 0,
-		 &dht_get_join_handler, NULL);
-	  */
-
-	}else
-	{
-
-	  struct GNUNET_SCRB_ServiceSubscriber *sub = GNUNET_new(struct GNUNET_SCRB_ServiceSubscriber);
-
-	  sub->group_id = hdr->group_id;
-	  sub->cid = hdr->client_id;
-
-	  GNUNET_CONTAINER_DLL_insert(subs->sub_head, subs->sub_tail, sub);
-
-	  send_subscribe_confirmation(sub, clients);
-	}
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
-
+	send_subscribe_confirmation(sub, clients);
   }
+  GNUNET_SERVER_receive_done (client, GNUNET_OK);
 
-  static void
-	handle_cl_leave_request (void *cls,
-							 struct GNUNET_SERVER_Client *client,
-							 const struct GNUNET_MessageHeader *message)
-  {
-	struct GNUNET_SCRB_ClntRqstLv *hdr;
-	hdr = (struct GNUNET_SCRB_ClntRqstLv *) message;
+}
 
-	struct GNUNET_BLOCK_SCRB_Leave leave_block;
+static void
+handle_cl_leave_request (void *cls,
+						 struct GNUNET_SERVER_Client *client,
+						 const struct GNUNET_MessageHeader *message)
+{
+  struct GNUNET_SCRB_ClntRqstLv *hdr;
+  hdr = (struct GNUNET_SCRB_ClntRqstLv *) message;
 
-	leave_block.sid = my_identity_hash;
-	leave_block.group_id = hdr->group_id;
+  struct GNUNET_BLOCK_SCRB_Leave leave_block;
 
-	/* fixme: do not ignore return handles */
-	put_dht_handle = GNUNET_DHT_put (dht_handle, &leave_block.group_id, 1,
-									 GNUNET_DHT_RO_RECORD_ROUTE |
-									 GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-									 GNUNET_BLOCK_SCRB_TYPE_LEAVE,
-									 sizeof (struct GNUNET_BLOCK_SCRB_Leave), &leave_block,
-									 GNUNET_TIME_UNIT_FOREVER_ABS,
-									 GNUNET_TIME_UNIT_FOREVER_REL,
-									 NULL, NULL);
+  leave_block.sid = my_identity_hash;
+  leave_block.group_id = hdr->group_id;
 
-	if(NULL == put_dht_handle)
-	  GNUNET_break(0);
+  /* fixme: do not ignore return handles */
+  put_dht_handle = GNUNET_DHT_put (dht_handle, &leave_block.group_id, 1,
+								   GNUNET_DHT_RO_RECORD_ROUTE |
+								   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+								   GNUNET_BLOCK_SCRB_TYPE_LEAVE,
+								   sizeof (struct GNUNET_BLOCK_SCRB_Leave), &leave_block,
+								   GNUNET_TIME_UNIT_FOREVER_ABS,
+								   GNUNET_TIME_UNIT_FOREVER_REL,
+								   NULL, NULL);
 
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
-  }
+  if(NULL == put_dht_handle)
+	GNUNET_break(0);
 
-
-
-  static int
-	send_publisher (void *cls,
-					const struct GNUNET_HashCode *key,
-					void *value)
-  {
-	struct ClientEntry *ce = cls;
-	struct GNUNET_SCRB_SrvcRplySrvcLst *msg;
-	struct GNUNET_SCRB_ServicePublisher* pub = value;
-	size_t msg_size = sizeof(struct GNUNET_SCRB_SrvcRplySrvcLst);
-
-	struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REPLY);
-
-	msg->header.size = htons((uint16_t) msg_size);
-	msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REPLY);
-	msg->pub = *pub;
-	msg->size = GNUNET_CONTAINER_multihashmap_size(publishers);
-
-	GNUNET_MQ_send (ce->mq, ev);
-	return GNUNET_OK;
-  }
-
-  static void
-	handle_cl_srvc_lst_request (void *cls,
-								struct GNUNET_SERVER_Client *client,
-								const struct GNUNET_MessageHeader *message)
-  {
-	const struct GNUNET_SCRB_ClntRqstSrvcLst* hdr = (struct GNUNET_SCRB_ClntRqstSrvcLst*) message;
-	struct ClientEntry *ce = GNUNET_CONTAINER_multihashmap_get(clients, &hdr->cid);
-	GNUNET_CONTAINER_multihashmap_iterate(publishers, &send_publisher, ce);
-
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
-  }
+  GNUNET_SERVER_receive_done (client, GNUNET_OK);
+}
 
 
-  static void
-	handle_cl_create_request (void *cls,
-							  struct GNUNET_SERVER_Client *client,
-							  const struct GNUNET_MessageHeader *message)
-  {
-	struct ClientEntry* ce;
-	if((ce = make_client_entry (client)) == NULL)
-	  return;
+
+static int
+send_publisher (void *cls,
+				const struct GNUNET_HashCode *key,
+				void *value)
+{
+  struct ClientEntry *ce = cls;
+  struct GNUNET_SCRB_SrvcRplySrvcLst *msg;
+  struct GNUNET_SCRB_ServicePublisher* pub = value;
+  size_t msg_size = sizeof(struct GNUNET_SCRB_SrvcRplySrvcLst);
+
+  struct GNUNET_MQ_Envelope* ev = GNUNET_MQ_msg(msg, GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REPLY);
+
+  msg->header.size = htons((uint16_t) msg_size);
+  msg->header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SERVICE_LIST_REPLY);
+  msg->pub = *pub;
+  msg->size = GNUNET_CONTAINER_multihashmap_size(publishers);
+
+  GNUNET_MQ_send (ce->mq, ev);
+  return GNUNET_OK;
+}
+
+static void
+handle_cl_srvc_lst_request (void *cls,
+							struct GNUNET_SERVER_Client *client,
+							const struct GNUNET_MessageHeader *message)
+{
+  const struct GNUNET_SCRB_ClntRqstSrvcLst* hdr = (struct GNUNET_SCRB_ClntRqstSrvcLst*) message;
+  struct ClientEntry *ce = GNUNET_CONTAINER_multihashmap_get(clients, &hdr->cid);
+  GNUNET_CONTAINER_multihashmap_iterate(publishers, &send_publisher, ce);
+
+  GNUNET_SERVER_receive_done (client, GNUNET_OK);
+}
+
+
+static void
+handle_cl_create_request (void *cls,
+						  struct GNUNET_SERVER_Client *client,
+						  const struct GNUNET_MessageHeader *message)
+{
+  struct ClientEntry* ce;
+  if((ce = make_client_entry (client)) == NULL)
+	return;
 	
-	const struct GNUNET_HashCode group_id = ce->cid;
+  const struct GNUNET_HashCode group_id = ce->cid;
 
-	struct GNUNET_BLOCK_SCRB_Create create_block;
+  struct GNUNET_BLOCK_SCRB_Create create_block;
 
-	create_block.cid = group_id;
-	create_block.sid = my_identity;
+  create_block.cid = group_id;
+  create_block.sid = my_identity;
 
-	/* fixme: care for the return handle as we should be able to shutdown
-	   later on */
-	put_dht_handle = GNUNET_DHT_put (dht_handle, &group_id, 1,
-									 GNUNET_DHT_RO_RECORD_ROUTE |
-									 GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-									 GNUNET_BLOCK_SCRB_TYPE_CREATE,
-									 sizeof (create_block), &create_block,
-									 GNUNET_TIME_UNIT_FOREVER_ABS,
-									 GNUNET_TIME_UNIT_FOREVER_REL,
-									 NULL, NULL);
+  /* fixme: care for the return handle as we should be able to shutdown
+	 later on */
+  put_dht_handle = GNUNET_DHT_put (dht_handle, &group_id, 1,
+								   GNUNET_DHT_RO_RECORD_ROUTE |
+								   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+								   GNUNET_BLOCK_SCRB_TYPE_CREATE,
+								   sizeof (create_block), &create_block,
+								   GNUNET_TIME_UNIT_FOREVER_ABS,
+								   GNUNET_TIME_UNIT_FOREVER_REL,
+								   NULL, NULL);
 
-	if(NULL == put_dht_handle)
-	  GNUNET_break(0);
+  if(NULL == put_dht_handle)
+	GNUNET_break(0);
 
-	GNUNET_SERVER_receive_done (client, GNUNET_OK);
-  }
+  GNUNET_SERVER_receive_done (client, GNUNET_OK);
+}
 
 /**
  * Sends a subscribe fail message to all the clients subscribed to the group
  *
  * @param grp         The group which clients need to be updated
  */
-  static void
-	client_send_subscribe_fail (struct Group* grp)
-  {	
-	struct GNUNET_SCRB_ClientSubscribeReplyMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
+static void
+client_send_subscribe_fail (struct Group* grp)
+{	
+  struct GNUNET_SCRB_ClientSubscribeReplyMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
 
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL);
-	msg->header.header.size = htons(sizeof(*msg));
-	msg->grp_key = grp->pub_key;
-	group_client_send_message(grp, msg->header.header);
-  }
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL);
+  msg->header.header.size = htons(sizeof(*msg));
+  msg->grp_key = grp->pub_key;
+  group_client_send_message(grp, msg->header.header);
+}
 
 /**
  * Sends a subscribe ack message to all the clients subscribed to the group
  *
  * @param grp         The group which clients need to be updated
  */
-  static void
-	client_send_subscribe_ack (struct Group* grp)
-  {	
-	struct GNUNET_SCRB_ClientSubscribeReplyMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
+static void
+client_send_subscribe_ack (struct Group* grp)
+{	
+  struct GNUNET_SCRB_ClientSubscribeReplyMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
 
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_ACK);
-	msg->header.header.size = htons(sizeof(*msg));
-	msg->grp_key = grp->pub_key;
-	group_client_send_message(grp, msg->header.header);
-  }
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_ACK);
+  msg->header.header.size = htons(sizeof(*msg));
+  msg->grp_key = grp->pub_key;
+  group_client_send_message(grp, msg->header.header);
+}
 
 
 /**
@@ -1597,86 +1602,94 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param grp         The group which clients need to be updated
  * @param peer        Identity of the child
  */
-  static void
-	client_send_child_change_event (const struct Group* grp, 
-									const struct GNUNET_PeerIdentity* peer,
-									uint16_t type)
-  {	
-	struct GNUNET_SCRB_ChildChangeEventMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
+static void
+client_send_child_change_event (const struct Group* grp, 
+								const struct GNUNET_PeerIdentity* peer,
+								uint16_t type)
+{	
+  struct GNUNET_SCRB_ChildChangeEventMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
 
-	msg->header.header.type = htons(type);
-	msg->header.header.size = htons(sizeof(*msg));
-	memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
-	memcpy(&msg->child, peer, sizeof(*peer));
-	group_client_send_message(grp, msg->header.header);
-  }
+  msg->header.header.type = htons(type);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
+  memcpy(&msg->child, peer, sizeof(*peer));
+  group_client_send_message(grp, msg->header.header);
+}
 
-  static struct Channel*
-	cadet_channel_create(struct Group* grp, struct GNUNET_PeerIdentity *peer)
-  {
-	struct Channel *chn = GNUNET_malloc (sizeof(*chn));
-	chn->grp = grp;
-	chn->group_key = grp->pub_key;
-    chn->group_key_hash = grp->pub_key_hash;
-	chn->peer = *peer;
-	chn->direction = DIR_OUTGOING;
-	chn->channel = GNUNET_CADET_channel_create( cadet, chn, &chn->peer,
-												GNUNET_APPLICATION_TYPE_SCRB,
-												GNUNET_CADET_OPTION_RELIABLE);
-	return chn;
-  }
+static struct Channel*
+cadet_channel_create(struct Group* grp, struct GNUNET_PeerIdentity *peer)
+{
+  struct Channel *chn = GNUNET_malloc (sizeof(*chn));
+  chn->grp = grp;
+  chn->group_key = grp->pub_key;
+  chn->group_key_hash = grp->pub_key_hash;
+  chn->peer = *peer;
+  chn->direction = DIR_OUTGOING;
+  chn->channel = GNUNET_CADET_channel_create( cadet, chn, &chn->peer,
+											  GNUNET_APPLICATION_TYPE_SCRB,
+											  GNUNET_CADET_OPTION_RELIABLE);
+  /*
+  //put it in the channels_in for a faster access
+  struct GNUNET_HashCode* peer_hash = GNUNET_malloc(sizeof(*peer_hash));
+  //hash of the  last peer
+  GNUNET_CRYPTO_Hash (peer_hash, sizeof(*peer), peer_hash);
+  GNUNET_CONTAINER_multihashmap_put(channels_out, peer_hash, chn,
+									GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
+  */
+  return chn;
+}
 
 /**
  * CADET is ready to transmit a message
  */
-  size_t
-	cadet_notify_transmit_ready(void* cls, size_t buf_size, void* buf)
+size_t
+cadet_notify_transmit_ready(void* cls, size_t buf_size, void* buf)
+{
+  if(0 == buf_size)
   {
-	if(0 == buf_size)
-	{
-	  return 0;
-	}
-	const struct GNUNET_MessageHeader* msg = cls;
-	uint16_t msg_size = ntohs(msg->size);
-	GNUNET_assert (msg_size <= buf_size);
-	memcpy(buf, msg, msg_size);
-	return msg_size;
+	return 0;
   }
+  const struct GNUNET_MessageHeader* msg = cls;
+  uint16_t msg_size = ntohs(msg->size);
+  GNUNET_assert (msg_size <= buf_size);
+  memcpy(buf, msg, msg_size);
+  return msg_size;
+}
 
 /**
  * Send a message to CADET channel
  * @param chn Channel
  * @param msg Message
  */
-  static void
-	cadet_send_msg(struct Channel* chn, const struct GNUNET_MessageHeader *msg)
-  {
-	chn->tmit_handle
-	  = GNUNET_CADET_notify_transmit_ready (chn->channel, GNUNET_NO,
-											GNUNET_TIME_UNIT_FOREVER_REL,
-											ntohs(msg->size),
-											&cadet_notify_transmit_ready,
-											(void*) msg);
-  }
+static void
+cadet_send_msg(struct Channel* chn, const struct GNUNET_MessageHeader *msg)
+{
+  chn->tmit_handle
+	= GNUNET_CADET_notify_transmit_ready (chn->channel, GNUNET_NO,
+										  GNUNET_TIME_UNIT_FOREVER_REL,
+										  ntohs(msg->size),
+										  &cadet_notify_transmit_ready,
+										  (void*) msg);
+}
 
 /**
  * Sends a subscribe parent message for the given node
  * @param grp      Group the node is taken into
  * @param node     Node
  */
-  static void
-	cadet_send_parent (struct Group* grp, struct NodeHandle* node)
-  {	
-	struct GNUNET_SCRB_SubscribeParentMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT);
-	msg->header.header.size = htons(sizeof(*msg));
-	msg->parent = node->chn->peer;
-	msg->grp_key = node->chn->group_key;
-	msg->grp_key_hash = node->chn->group_key_hash;
-	cadet_send_msg(node->chn, msg->header.header);
-  }
+static void
+cadet_send_parent (struct Group* grp, struct NodeHandle* node)
+{	
+  struct GNUNET_SCRB_SubscribeParentMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_SEND_PARENT);
+  msg->header.header.size = htons(sizeof(*msg));
+  msg->parent = node->chn->peer;
+  msg->grp_key = node->chn->group_key;
+  msg->grp_key_hash = node->chn->group_key_hash;
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
 /**
  * Sends a group modification event message to the given node
@@ -1685,23 +1698,23 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param child    Child
  * @param op       Add/Rem -> 1/0
  */
-  static void
-	cadet_send_child_event (struct Group* grp,
-							struct NodeHandle* node,
-							struct GNUNET_PeerIdentity* child,
-							uint8_t op)
-  {	
-	struct GNUNET_SCRB_ChildChangeEventMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
-	if(1 == op)
-	  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);
-	else
-	  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_REM);
-	msg->header.header.size = htons(sizeof(*msg));
-	memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
-	memcpy(&msg->child, child, sizeof(*node->peer));	
-	cadet_send_msg(node->chn, msg->header.header);
-  }
+static void
+cadet_send_child_event (struct Group* grp,
+						struct NodeHandle* node,
+						struct GNUNET_PeerIdentity* child,
+						uint8_t op)
+{	
+  struct GNUNET_SCRB_ChildChangeEventMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  if(1 == op)
+	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);
+  else
+	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_REM);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
+  memcpy(&msg->child, child, sizeof(*node->peer));	
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
 /**
  * Sends a group modification event message to all children of the given
@@ -1710,22 +1723,56 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param grp      Group the node is taken into
  * @param op       Add/Rem -> 1/0
  */
-  static void
-	cadet_send_child_event_all (const struct Group* grp,
-								const struct GNUNET_PeerIdentity* child,
-								uint8_t op)
-  {	
-	struct GNUNET_SCRB_ChildChangeEventMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
-	if(1 == op)
-	  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);
-	else
-	  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_REM);
-	msg->header.header.size = htons(sizeof(*msg));
-	memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
-	memcpy(&msg->child, child, sizeof(*child));	
-	group_children_send_message(node->chn, msg->header.header);
-  }
+static void
+cadet_send_child_event_all (const struct Group* grp,
+							const struct GNUNET_PeerIdentity* child,
+							uint8_t op)
+{	
+  struct GNUNET_SCRB_ChildChangeEventMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  if(1 == op)
+	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_ADD);
+  else
+	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_CHILD_REM);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->grp_key, grp->pub_key, sizeof(*grp->pub_key));
+  memcpy(&msg->child, child, sizeof(*child));	
+  group_children_send_message(node->chn, msg->header.header);
+}
+
+/**
+ * Sends a downstream message to the recipient
+ *
+ * @param node        Node
+ * @param src         Source of the subscribe message
+ * @param path        Path to the peer where the message is processed
+ * @param path_length Length of the path
+ */
+static void
+cadet_send_downstream_msg (struct NodeHandle* node, struct GNUNET_SCRB_Content* content,
+						   struct GNUNET_PeerIdentity* src, struct GNUNET_PeerIdentity* dst,
+						   struct GNUNET_PeerIdentity* path, unsigned int path_length,
+						   unsigned int offset)
+{	
+  struct GNUNET_SCRB_DownStreamMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_DWNSTRM_MSG);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->content, content, sizeof(*content));
+  memcpy(&msg->src, src, sizeof(*src));
+  memcpy(&msg->next, node->peer, sizeof(*node->peer));
+  memcpy(&msg->dst, dst, sizeof(*dst));
+  msg->path_to_failed = GNUNET_new (struct GNUNET_SCRB_RoutePath);
+  //save path in the message
+  msg->path->path = GNUNET_malloc (path_length * sizeof(struct GNUNET_PeerIdentity));
+  memcpy(msg->path->path, path, path_length * sizeof(*path));
+  msg->path->path_length = path_length;
+  //where we are on the path
+  msg->path->offset = offset;
+  memcpy(&msg->grp_key, node->chn->group_key, sizeof(*msg->grp_key));
+  GNUNET_CRYPTO_hash_create_random(GNUNET_CRYPTO_QUALITY_WEAK, &msg->id);
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
 
 /**
@@ -1735,27 +1782,27 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param path        Path to the peer where the message is processed
  * @param path_length Length of the path
  */
-  static void
-	cadet_send_subscribe_fail (struct NodeHandle* node, struct GNUNET_PeerIdentity* src,
-							   struct GNUNET_PeerIdentity* path, unsigned int path_length,
-							   unsigned int offset)
-  {	
-	struct GNUNET_SCRB_SubscribeFailMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL);
-	msg->header.header.size = htons(sizeof(*msg));
-	memcpy(&msg->source, src, sizeof(*src));
-	msg->path_to_failed = GNUNET_new (struct GNUNET_SCRB_RoutePath);
-	//save path in the message
-	msg->path_to_failed->path = GNUNET_malloc (path_length * sizeof(struct GNUNET_PeerIdentity));
-	memcpy(msg->path_to_failed->path, path, path_length * sizeof(*path));
-	msg->path_to_failed->path_length = path_length;
-	//where we are on the path
-	msg->path_to_failed->offset = offset;
-	msg->grp_key = node->chn->group_key;
-	msg->grp_key_hash = node->chn->group_key_hash;
-	cadet_send_msg(node->chn, msg->header.header);
-  }
+static void
+cadet_send_subscribe_fail (struct NodeHandle* node, struct GNUNET_PeerIdentity* src,
+						   struct GNUNET_PeerIdentity* path, unsigned int path_length,
+						   unsigned int offset)
+{	
+  struct GNUNET_SCRB_SubscribeFailMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->source, src, sizeof(*src));
+  msg->path_to_failed = GNUNET_new (struct GNUNET_SCRB_RoutePath);
+  //save path in the message
+  msg->path_to_failed->path = GNUNET_malloc (path_length * sizeof(struct GNUNET_PeerIdentity));
+  memcpy(msg->path_to_failed->path, path, path_length * sizeof(*path));
+  msg->path_to_failed->path_length = path_length;
+  //where we are on the path
+  msg->path_to_failed->offset = offset;
+  msg->grp_key = node->chn->group_key;
+  msg->grp_key_hash = node->chn->group_key_hash;
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
 /**
  * Sends a subscribe ack message to the given node
@@ -1766,151 +1813,151 @@ forward_join(const struct GNUNET_HashCode* key,
  * @param ptr_lenght   Length of the path to root
  * @param path_to_ack Path to the group root node
  */
-  static void
-	cadet_send_subscribe_ack (struct NodeHandle* node,
-							  struct GNUNET_PeerIdentity* src,
-							  struct GNUNET_PeerIdentity* path_to_root,
-							  unsigned int ptr_length,
-							  struct GNUNET_PeerIdentity* path_to_ack,
-							  unsigned int pta_length,
-							  unsigned int offset)
-  {	
-	struct GNUNET_SCRB_SubscribeAckMessage*
-	  msg = GNUNET_malloc (sizeof(*msg));
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_ACK);
-	msg->header.header.size = htons(sizeof(*msg));
-	memcpy(&msg->source, src, sizeof(*src));
-	//save path to root in the message
-	msg->path_to_root->path = GNUNET_malloc (path_length * sizeof(struct GNUNET_PeerIdentity));
-	memcpy(msg->path_to_root->path, path_to_root, ptr_length * sizeof(*path_to_root));
-	msg->path_to_root->path_length = ptr_length;
-	//save path to acknoledging node
-	msg->path_to_ack->path = GNUNET_malloc (pta_length * sizeof(struct GNUNET_PeerIdentity));
-	memcpy(msg->path_to_ack->path, path_to_ack, pta_length * sizeof(*path_to_ack));
-	msg->path_to_ack->path_length = pta_length;
-	//where we are on the path
-	msg->path_to_ack->offset = offset;
-	msg->grp_key = node->chn->group_key;
-	msg->grp_key_hash = node->chn->group_key_hash;
-	cadet_send_msg(node->chn, msg->header.header);
-  }
+static void
+cadet_send_subscribe_ack (struct NodeHandle* node,
+						  struct GNUNET_PeerIdentity* src,
+						  struct GNUNET_PeerIdentity* path_to_root,
+						  unsigned int ptr_length,
+						  struct GNUNET_PeerIdentity* path_to_ack,
+						  unsigned int pta_length,
+						  unsigned int offset)
+{	
+  struct GNUNET_SCRB_SubscribeAckMessage*
+	msg = GNUNET_malloc (sizeof(*msg));
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_ACK);
+  msg->header.header.size = htons(sizeof(*msg));
+  memcpy(&msg->source, src, sizeof(*src));
+  //save path to root in the message
+  msg->path_to_root->path = GNUNET_malloc (path_length * sizeof(struct GNUNET_PeerIdentity));
+  memcpy(msg->path_to_root->path, path_to_root, ptr_length * sizeof(*path_to_root));
+  msg->path_to_root->path_length = ptr_length;
+  //save path to acknoledging node
+  msg->path_to_ack->path = GNUNET_malloc (pta_length * sizeof(struct GNUNET_PeerIdentity));
+  memcpy(msg->path_to_ack->path, path_to_ack, pta_length * sizeof(*path_to_ack));
+  msg->path_to_ack->path_length = pta_length;
+  //where we are on the path
+  msg->path_to_ack->offset = offset;
+  msg->grp_key = node->chn->group_key;
+  msg->grp_key_hash = node->chn->group_key_hash;
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
-  static void
-	cadet_send_direct_anycast(struct GNUNET_SCRB_MessageHeader* m,
-							  const struct NodeHandle* handle,
-							  const struct GNUNET_SCRB_Policy* policy)
-  {
-	struct GNUNET_SCRB_AnycastMessage*
-	  msg = (struct GNUNET_SCRB_AnycastMessage*)m;
-	msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_ANYCAST);
-	msg->header.header.size = htons(sizeof(*msg));
-	cadet_send_msg(node->chn, msg->header.header);
-  }
+static void
+cadet_send_direct_anycast(struct GNUNET_SCRB_MessageHeader* m,
+						  const struct NodeHandle* handle,
+						  const struct GNUNET_SCRB_Policy* policy)
+{
+  struct GNUNET_SCRB_AnycastMessage*
+	msg = (struct GNUNET_SCRB_AnycastMessage*)m;
+  msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_ANYCAST);
+  msg->header.header.size = htons(sizeof(*msg));
+  cadet_send_msg(node->chn, msg->header.header);
+}
 
-  int
-	cadet_recv_direct_anycast(void* cls, 
-							  struct GNUNET_CADET_Channel* channel,
-							  void** ctx,
-							  const struct GNUNET_MessageHeader* m)
+int
+cadet_recv_direct_anycast(void* cls, 
+						  struct GNUNET_CADET_Channel* channel,
+						  void** ctx,
+						  const struct GNUNET_MessageHeader* m)
+{
+  const struct GNUNET_SCRB_AnycastMessage*
+	msg = (struct GNUNET_SCRB_AnycastMessage*)m;
+  uint16_t size = ntohs(m->size);
+  if(size < sizeof(*msg))
   {
-	const struct GNUNET_SCRB_AnycastMessage*
-	  msg = (struct GNUNET_SCRB_AnycastMessage*)m;
-	uint16_t size = ntohs(m->size);
-	if(size < sizeof(*msg))
-	{
-	  GNUNET_break_op(0);
-	  return GNUNET_SYSERR;
-	}
-	if(NULL != *ctx)
-	{
-	  GNUNET_break_op(0);
-	  return GNUNET_SYSERR;
-	}
-	//FIXME: here should be some necessary security checks
-	struct GNUNET_CRYPTO_EddsaPublicKey group_key;
-	memcpy(&group_key, &msg->group_key, sizeof(group_key));
-	struct GNUNET_HashCode group_key_hash;
-	GNUNET_CRYPTO_Hash (&group_key, sizeof(group_key), &group_key_hash);
+	GNUNET_break_op(0);
+	return GNUNET_SYSERR;
+  }
+  if(NULL != *ctx)
+  {
+	GNUNET_break_op(0);
+	return GNUNET_SYSERR;
+  }
+  //FIXME: here should be some necessary security checks
+  struct GNUNET_CRYPTO_EddsaPublicKey group_key;
+  memcpy(&group_key, &msg->group_key, sizeof(group_key));
+  struct GNUNET_HashCode group_key_hash;
+  GNUNET_CRYPTO_Hash (&group_key, sizeof(group_key), &group_key_hash);
 	
-	struct Group*
-	  grp = GNUNET_CONTAINER_multihashmap_get (groups, &grp_key_hash);
-	if(NULL != *grp)
-	{
-	  GNUNET_break_op(0);
-	  return GNUNET_SYSERR;
-	}
-	struct GNUNET_SCRB_Content* content;
-	memcpy(content, &msg->content, sizeof(&msg->content));
-	if(SUBSCRIBE == content->type)
-	{
-	  //we have received the join block
-	  struct GNUNET_BLOCK_SCRB_Join* join_block = (struct GNUNET_BLOCK_SCRB_Join*)content->data;
-	  struct GNUNET_SCRB_RoutePath path_to_orig;
-	  memcpy(&path, &msg->path_to_orig, sizeof(msg->path_to_orig));
-	  //create a handle for the subscribing node
-	  struct GNUNET_PeerIdentity* path = path_to_orig->path;
-	  unsigned int path_length = path_to_orig->path_length;
-	  struct GNUNET_PeerIdentity* lp = &path[path_length - 1];
-	  struct GNUNET_HashCode* lp_hash = GNUNET_malloc(sizeof(*lp_hash));
-	  //hash of the  last peer
-	  GNUNET_CRYPTO_Hash (lp, sizeof(*lp), lp_hash);
+  struct Group*
+	grp = GNUNET_CONTAINER_multihashmap_get (groups, &grp_key_hash);
+  if(NULL != *grp)
+  {
+	GNUNET_break_op(0);
+	return GNUNET_SYSERR;
+  }
+  struct GNUNET_SCRB_Content* content;
+  memcpy(content, &msg->content, sizeof(&msg->content));
+  if(SUBSCRIBE == content->type)
+  {
+	//we have received the join block
+	struct GNUNET_BLOCK_SCRB_Join* join_block = (struct GNUNET_BLOCK_SCRB_Join*)content->data;
+	struct GNUNET_SCRB_RoutePath path_to_orig;
+	memcpy(&path, &msg->path_to_orig, sizeof(msg->path_to_orig));
+	//create a handle for the subscribing node
+	struct GNUNET_PeerIdentity* path = path_to_orig->path;
+	unsigned int path_length = path_to_orig->path_length;
+	struct GNUNET_PeerIdentity* lp = &path[path_length - 1];
+	struct GNUNET_HashCode* lp_hash = GNUNET_malloc(sizeof(*lp_hash));
+	//hash of the  last peer
+	GNUNET_CRYPTO_Hash (lp, sizeof(*lp), lp_hash);
 
-	  //create a handle for the node
-	  struct NodeHandle* node = GNUNET_new (struct NodeHandle);
-	  node->peer = GNUNET_new (struct GNUNET_PeerIdentity);
-	  node->peer_hash = lp_hash;
-	  memcpy(node->peer, lp, sizeof(*lp));
-	  node->ch = cadet_channel_create(grp, node->peer);
+	//create a handle for the node
+	struct NodeHandle* node = GNUNET_new (struct NodeHandle);
+	node->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+	node->peer_hash = lp_hash;
+	memcpy(node->peer, lp, sizeof(*lp));
+	node->ch = cadet_channel_create(grp, node->peer);
 
-	  //we have received back our anycast
-	  if(0 == memcmp(&msg->orig, &my_identity, sizeof(my_identity)))
-	  {		
-		struct GNUNET_PeerIdentity* next = NULL;
-		if(NULL != policy->get_next_anycst_cb)
-		  next = policy->get_next_anycst_cb(policy, msg, NULL);
-		if(NULL == next)
-		{
-		  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-					  "Anycast fail to group %s.\n",
-					  GNUNET_h2s (grp->pub_key_hash));
-		  //send back subscribe fail
-		  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-					  "Sending subsribe fail message to %s for group %s.\n",
-					  GNUNET_h2s (lp_hash),
-					  GNUNET_h2s (grp->pub_key_hash));
+	//we have received back our anycast
+	if(0 == memcmp(&msg->orig, &my_identity, sizeof(my_identity)))
+	{		
+	  struct GNUNET_PeerIdentity* next = NULL;
+	  if(NULL != policy->get_next_anycst_cb)
+		next = policy->get_next_anycst_cb(policy, msg, NULL);
+	  if(NULL == next)
+	  {
+		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+					"Anycast fail to group %s.\n",
+					GNUNET_h2s (grp->pub_key_hash));
+		//send back subscribe fail
+		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+					"Sending subsribe fail message to %s for group %s.\n",
+					GNUNET_h2s (lp_hash),
+					GNUNET_h2s (grp->pub_key_hash));
 
-		  cadet_send_subscribe_fail (node, &join_block->src,
-									 path, path_length,
-									 0);//we send, no offset
-		}else
-		{
-		  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-					  "handle forward subscribe: routing message to peer %s for group %s.\n",
-					  GNUNET_h2s (node->peer_hash),
-					  GNUNET_h2s (grp->pub_key_hash));
-		  struct NodeHandle* handle = NULL;
-		  if(NULL == (handle = group_children_get(grp, next)))
-		  {
-			//create a handle for the next peer
-			handle = GNUNET_new (struct NodeHandle);
-			handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
-			handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
-			GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
-			memcpy(handle->peer, next, sizeof(*next));
-			handle->ch = cadet_channel_create(grp, handle->peer);	
-		  }
-		  //copy the contents of the message and send it to another
-		  //recipient
-		  struct GNUNET_SCRB_AnycastMessage* new_msg = GNUNET_malloc(sizeof(*new_msg));
-		  memcpy(new_msg, msg, sizeof(msg));
-		  cadet_send_direct_anycast(&my_identity, msg, handle, policy);
-		}
+		cadet_send_subscribe_fail (node, &join_block->src,
+								   path, path_length,
+								   0);//we send, no offset
 	  }else
 	  {
-		  //we are not the message originator
-		  //we do the same checks to subscribe the node
-	  
+		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+					"handle forward subscribe: routing message to peer %s for group %s.\n",
+					GNUNET_h2s (node->peer_hash),
+					GNUNET_h2s (grp->pub_key_hash));
+		struct NodeHandle* handle = NULL;
+		if(NULL == (handle = group_children_get(grp, next)))
+		{
+		  //create a handle for the next peer
+		  handle = GNUNET_new (struct NodeHandle);
+		  handle->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+		  handle->peer_hash = GNUNET_new (struct GNUNET_HashCode);
+		  GNUNET_CRYPTO_Hash (next, sizeof(*next), handle->peer_hash);		
+		  memcpy(handle->peer, next, sizeof(*next));
+		  handle->ch = cadet_channel_create(grp, handle->peer);	
+		}
+		//copy the contents of the message and send it to another
+		//recipient
+		struct GNUNET_SCRB_AnycastMessage* new_msg = GNUNET_malloc(sizeof(*new_msg));
+		memcpy(new_msg, msg, sizeof(msg));
+		cadet_send_direct_anycast(&my_identity, msg, handle, policy);
 	  }
+	}else
+	{
+	  //we are not the message originator
+	  //we do the same checks to subscribe the node
+	  
+	}
 
 	
   }
@@ -1988,30 +2035,112 @@ forward_join(const struct GNUNET_HashCode* key,
 	  GNUNET_break_op(0);
 	  return GNUNET_SYSERR;
 	}
+	struct NodeHandle* parent = GNUNET_new (struct NodeHandle);
+	node->peer = GNUNET_new (struct GNUNET_PeerIdentity);
+	memcpy(node->peer, &msg->parent, sizeof(*node->peer));
+	node->peer_hash = GNUNET_new (struct GNUNET_HashCode);
+	GNUNET_CRYPTO_Hash (node->peer, sizeof(*node->peer), node->peer_hash);
 	//create a channel for parent
-	struct Channel* chn = GNUNET_malloc(sizeof *chn);
+	struct Channel* chn = GNUNET_malloc(sizeof (*node->chn));
 	chn->grp = grp;
 	chn->channel = channel;
-	chn->group_key = msg->grp_key;
-	chn->group_key_hash = msg->grp_key_hash;
-	chn->peer = msg->parent;
+	memcpy(chn->group_key, &msg->grp_key, sizeof(*chn->group_key));
+	memcpy(chn->group_key_hash, &msg->grp_key_hash, sizeof(*chn->group_key_hash));
+	memcpy(chn->peer, &msg->parent, sizeof(*chn->peer));
 	chn->direction = DIR_INCOMING;
-	/* GNUNET_CONTAINER_multihashmap_put (channels_in, chn->group_key_hash, chn, */
-	/* 								   GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE); */
+	//GNUNET_CONTAINER_multihashmap_put (channels_in, chn->group_key_hash, chn,
+	//								   GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
+	node->chn = chn;
 	//save the channel as parent channel in group
-	grp->parent = chn;
+	grp->parent = parent;
 	return GNUNET_OK;
 	
   }
 
 /**
+ * Receives a downstream message.
+ * 
+ * D.S.M.1 if we are not recipients
+ *   D.S.M.1.1 send the message down the stream 
+ * D.S.M 2 extract contents
+ *   D.S.M 2.1 if the content is message
+ *     D.S.M 2.1.1 if subscribe fail message
+ *       D.S.M 2.1.1.1 call a handler for subscribe fail
+ *     D.S.M 2.1.2 if subscribe ack message
+ *       D.S.M 2.1.2.1 call a handler for subscribe ack
+ */
+int
+cadet_recv_downstream_msg(void* cls,
+						  struct GNUNET_CADET_Channel* channel,
+						  void** ctx,
+						  const struct GNUNET_MessageHeader* m)
+{
+	const struct GNUNET_SCRB_DownStreamMessage*
+	  msg = (struct GNUNET_SCRB_DownStreamMessage*)m;
+	uint16_t size = ntohs(m->size);
+	if(size < sizeof(*msg))
+	{
+	  GNUNET_break_op(0);
+	  return GNUNET_SYSERR;
+	}
+	if(NULL != *ctx)
+	{
+	  GNUNET_break_op(0);
+	  return GNUNET_SYSERR;
+	}
+	struct NodeHandle* next = NULL;
+	if(0 == memcmp(&my_identity, &msg.dst, sizeof(struct GNUNET_PeerIdentity)))
+	{
+		//D.S.M.1 we are not recipients
+		next = dstrm_msg_get_next(msg);
+		if(NULL == next)
+		{
+			//we are not recipients, we cannot send further
+			//for now do not handle, just drop
+			//TO-DO: add msg fail handler
+			
+		}else
+		{
+			//D.S.M.1.1 send the message down the stream
+			struct GNUNET_SCRB_DownStreamMessage*
+				new_msg = GNUNET_malloc (sizeof(*msg));
+			memcpy(new_msg, msg, sizeof(*msg));
+			memcpy(&new_msg->next, next->peer, sizeof(*next->peer));
+			//increase the offset before sending
+			new_msg->path.offset++;
+			cadet_send_msg(next->chn, new_msg->header.header);
+		}
+		
+	}
+	//D.S.M 2 extract contents
+	const struct GNUNET_SCRB_Content content;
+	memcpy(&content, &msg->content, sizeof(msg->content));
+	//	D.S.M 2.1 if the content is message
+	if(MSG == content.type)
+	{
+		const struct GNUNET_MessageHeader m;
+		memcpy(&m, content.data, content.data_size);
+   		
+		if(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL = ntohs(m.type))
+		{
+			// D.S.M 2.1.1 if subscribe fail message
+			recv_subscribe_fail_handler(cls, m, next == NULL? NULL: next->peer);
+			
+		}else if(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_ACK = ntohs(m.type))
+		{
+			// D.S.M 2.1.2 if subscribe ack message
+		}
+	}
+	
+}
+
+/**
  * Incoming subscribe fail message
  */ 
-  int
-	cadet_recv_subscribe_fail(void* cls, 
-							  struct GNUNET_CADET_Channel* channel,
-							  void** ctx,
-							  const struct GNUNET_MessageHeader* m)
+int
+recv_subscribe_fail_handler(void* cls, 
+							const struct GNUNET_MessageHeader* m,
+							const struct GNUNET_PeerIdentity* next)
   {
 	const struct GNUNET_SCRB_SubscribeFailMessage*
 	  msg = (struct GNUNET_SCRB_SubscribeFailMessage*)m;
@@ -2151,6 +2280,14 @@ forward_join(const struct GNUNET_HashCode* key,
   }
 
 
+/**
+ * A subscribe request from the client
+ * 
+ * c.s.1 group is not created
+ *   c.s.1.1 create group
+ *   c.s.1.3 send subscribe request via dht
+ * c.s.2 add client to clients
+ */
   static void
 	client_recv_subscribe (void *cls, struct GNUNET_SERVER_Client *client,
 						   const struct GNUNET_MessageHeader *message)
@@ -2174,15 +2311,6 @@ forward_join(const struct GNUNET_HashCode* key,
 	//copy the content
 	struct GNUNET_SCRB_Content content;
 	memcpy(&content, sizeof(content), &sm->content);
-	//take group or create
-	struct Group* grp =
-	  client = GNUNET_CONTAINER_multihashmap_get (groups, &pub_key_hash);
-	if(NULL == grp)
-	{
-	  grp = GNUNET_new(struct Group);
-	  grp->pub_key = group_key;
-	  grp->pub_key_hash = group_key_hash;
-	}
 	//take client context or create
 	struct Client* 
 	  sclient = GNUNET_SERVER_client_get_user_context(client, struct Client); 
@@ -2195,7 +2323,42 @@ forward_join(const struct GNUNET_HashCode* key,
 	  sclient->pub_key_hash = client_pub_key_hash;
 	  GNUNET_SERVER_client_set_user_context (client, sclient);
 	}
-	//add client to group client list 
+	//take group or create
+	struct Group* grp =
+	  client = GNUNET_CONTAINER_multihashmap_get (groups, &pub_key_hash);
+	if(NULL == grp)//c.s.1 group is created
+	{
+	  //c.s.1.1 create group
+	  grp = GNUNET_new(struct Group);
+	  grp->pub_key = group_key;
+	  grp->pub_key_hash = group_key_hash;
+	  //c.s.1.2 send subscribe message via dht
+	  struct GNUNET_BLOCK_SCRB_Join *
+		join_block = GNUNET_new(struct GNUNET_BLOCK_SCRB_Join);
+
+	  join_block->gr_pub_key = group_key;
+	  join_block->gr_pub_key_hash = group_key_hash;
+	  join_block->cl_pr_key = client_priv_key;
+	  join_block->cl_pub_key = client_pub_key;
+	  join_block->cl_pub_key_hash = client_pub_key_hash;
+	  join_block->src = my_identity;
+	  join_block->src_hash = my_identity_hash;
+	  join_block->content = content;
+	  //send message via DHT
+	  put_dht_handle = GNUNET_DHT_put (dht_handle, &group_key_hash, 1,
+									   GNUNET_DHT_RO_RECORD_ROUTE |
+									   GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
+									   GNUNET_BLOCK_SCRB_TYPE_JOIN,
+									   sizeof (join_block), join_block,
+									   GNUNET_TIME_UNIT_FOREVER_ABS,
+									   GNUNET_TIME_UNIT_FOREVER_REL,
+									   NULL, NULL);
+
+	  if(NULL == put_dht_handle)
+		GNUNET_break(0);
+	}
+	
+	//c.s.2 add client to group client list 
 	struct ClientList *cl = GNUNET_new (struct ClientList);
 	cl->client = client;
 	GNUNET_CONTAINER_DLL_insert (grp->cl_head, grp->cl_tail, cl);
@@ -2203,32 +2366,9 @@ forward_join(const struct GNUNET_HashCode* key,
 	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"%p Client connected to group %s. \n",
 				cl_ctx, GNUNET_h2s (&grp->pub_key_hash));
-	//operation is done on our side
-	//next, we send subscribe message via dht
-	//to other peers
-	struct GNUNET_BLOCK_SCRB_Join *
-	  join_block = GNUNET_new(struct GNUNET_BLOCK_SCRB_Join);
-
-	join_block->gr_pub_key = group_key;
-	join_block->gr_pub_key_hash = group_key_hash;
-	join_block->cl_pr_key = client_priv_key;
-	join_block->cl_pub_key = client_pub_key;
-	join_block->cl_pub_key_hash = client_pub_key_hash;
-	join_block->src = my_identity;
-    join_block->src_hash = my_identity_hash;
-	join_block->content = content;
-	//send message via DHT
-	put_dht_handle = GNUNET_DHT_put (dht_handle, &group_key_hash, 1,
-									 GNUNET_DHT_RO_RECORD_ROUTE |
-									 GNUNET_DHT_RO_DEMULTIPLEX_EVERYWHERE | GNUNET_DHT_RO_LAST_HOP,
-									 GNUNET_BLOCK_SCRB_TYPE_JOIN,
-									 sizeof (join_block), join_block,
-									 GNUNET_TIME_UNIT_FOREVER_ABS,
-									 GNUNET_TIME_UNIT_FOREVER_REL,
-									 NULL, NULL);
-
-	if(NULL == put_dht_handle)
-	  GNUNET_break(0);
+	
+    //operation is done on our side
+	
 	GNUNET_SERVER_receive_done (client, GNUNET_OK);
   }
 
@@ -2688,7 +2828,27 @@ forward_join(const struct GNUNET_HashCode* key,
 	return ret;
   };
 
-
+struct NodeHandle*
+dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg)
+{
+	struct GNUNET_CRYPTO_EddsaPublicKey group_key;
+	struct GNUNET_HashCode group_key_hash;
+	memcpy(&group_key, sizeof(group_key), &sm->group_key);
+	GNUNET_CRYPTO_Hash (&group_key, sizeof(group_key), &group_key_hash);
+	struct Group* grp =
+	  client = GNUNET_CONTAINER_multihashmap_get (groups, &pub_key_hash);
+	if(NULL == grp)
+		return NULL;
+	struct GNUNET_SCRB_RoutePath path;
+	memcpy(&path, &msg->path, sizeof(msg->path));
+	struct GNUNET_PeerIdentity* path = path->path;
+	unsigned int path_length = path->path_length;
+	unsigned int offset = path->offset;
+	struct GNUNET_PeerIdentity *next = path[path_length - 1 - offset];
+	struct NodeHandle* child = NULL;
+	child = group_children_get(grp, next);
+	return child;
+};
 
 /**
  * A client disconnected.  Remove all of its data structure entries.

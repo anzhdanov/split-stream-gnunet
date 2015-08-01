@@ -99,7 +99,7 @@ struct GNUNET_SCRB_MessageHeader
 
 enum GNUNET_SCRB_ContentType
 {
-  SUBSCRIBE, MULTICAST
+  MSG, MULTICAST
 };
 
 /**

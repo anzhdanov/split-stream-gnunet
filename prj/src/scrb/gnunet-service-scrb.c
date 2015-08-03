@@ -176,8 +176,21 @@ static unsigned int id_counter = 0;
 
 static struct GNUNET_CONTAINER_MultiHashMap *clients;
 
+struct RouteList
+{
+	struct GNUNET_SCRB_RoutePath* path;
+	struct RoutePath* prev;
+	struct RoutePath* next;
+};
+
 struct NodeHandle
 {
+  /**
+   * list of routes
+   */
+  struct RouteList* rl_head;
+  struct RouteList* rl_tail;
+  
   struct GNUNET_PeerIdentity* peer;
   struct CNUNET_HashCode* peer_hash;
   struct Channel* chn;
@@ -339,6 +352,31 @@ group_child_add_helper(const struct GNUNET_SCRB_Policy* policy,
  */
 struct NodeHandle*
 dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg);
+
+/**
+ * Updates the group map.
+ *
+ * 1.for all children
+ * 1.1  for all paths
+ *    1.1.1 if path_path
+ *       1.1.1.1 return group_replace_path
+ * 2. return 0
+ */
+int
+group_update_map(struct Group* grp,
+				 struct GNUNET_PeerIdentity* path,
+				 unsigned int path_length);
+
+int
+route_replace_path(struct GNUNET_SCRB_RoutePath* path,
+				   struct GNUNET_PeerIdentity* path,
+				   unsigned int path_length);
+
+struct GNUNET_PeerIdentity*
+path_path(struct GNUNET_PeerIdentity* path,
+		  unsigned int path_length,
+		  struct GNUNET_PeerIdentity* n_path,
+		  unsigned int n_path_length);
 
 struct Client
 {
@@ -920,6 +958,8 @@ forward_join(const struct GNUNET_HashCode* key,
 				  "The node %s is already in group %s.\n",
 				  GNUNET_h2s (lp_hash),
 				  GNUNET_h2s (grp->pub_key_hash));
+	  //update map
+	  group_update_map(grp, path, path_length);
 	  return CHECK_FAIL;
 	}
 	//f.1.3 check if any of the children are on the path
@@ -2849,6 +2889,49 @@ dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg)
 	child = group_children_get(grp, next);
 	return child;
 };
+
+int
+group_update_map(struct Group* grp,
+				 struct GNUNET_PeerIdentity* path,
+				 unsigned int path_length)
+{
+	struct NodeList* nl = grp->nl_head;
+	while(NULL != nl)
+	{
+	  if(1 == path_path(path, path_length, nl->node))
+	  {
+		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+					"Rejecting subsribe message for group %s, the child %s is already on the path.\n",
+					GNUNET_h2s (grp->pub_key_hash),
+					GNUNET_h2s (node->peer_hash));
+		return CHECK_FAIL;
+	  }
+	  nl = nl->next;
+	}
+}
+
+int
+route_replace_path(struct GNUNET_SCRB_RoutePath* path,
+				   struct GNUNET_PeerIdentity* path,
+				   unsigned int path_length)
+{
+}
+
+struct GNUNET_PeerIdentity*
+path_path(struct GNUNET_PeerIdentity* path,
+		  unsigned int path_length,
+		  struct GNUNET_PeerIdentity* n_path,
+		  unsigned int n_path_length)
+{
+	struct GNUNET_PeerIdentity* p = path + path_length - 1;
+	struct GNUNET_PeerIdentity* s = n_path + n_path_length - 1;
+	for(;p >= path && s >= n_path; p--, s-- )
+	{
+		if(0 != memcmp(*p, *s, sizeof(*s)))
+			return p;
+	}
+	return NULL;
+}
 
 /**
  * A client disconnected.  Remove all of its data structure entries.

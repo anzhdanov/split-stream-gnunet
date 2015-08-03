@@ -99,9 +99,19 @@ default_map_put_path (struct GNUNET_SCRB_RouteMap* route_map,
     
     if(NULL != prev)
     {
-      struct KnotList* kl = GNUNET_malloc(sizeof(*kl));
-      kl->knot = knot;
-      GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, kl);
+      struct KnotList* kl = prev->kl_head;
+      while(NULL != kl)
+      {
+        if(0 == memcmp(kl->knot, knot, sizeof(struct Knot))
+          break;
+        kl = kl->next;
+      }
+      if(NULL == kl)
+      {
+        kl = GNUNET_malloc(sizeof(*kl));
+        kl->knot = knot;
+        GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, kl);
+      }
     } 
     prev = knot;    
   }      

@@ -39,6 +39,8 @@
 #include "scrb_group.h"
 #include "scrb_publisher.h"
 #include "scrb_subscriber.h"
+#include "scrb_map.h"
+#include "scrb_policy.h"
 
 /**
  * A CADET handle
@@ -49,6 +51,11 @@ static struct GNUNET_CADET_Handle *cadet;
  * Scribe policy
  */
 static struct GNUNET_SCRB_Policy *policy;
+
+/**
+ * Scribe map view
+ */
+static struct GNUNET_SCRB_RouteMap *route_map;
 
 #define CHUNK 1024
 /**
@@ -176,21 +183,8 @@ static unsigned int id_counter = 0;
 
 static struct GNUNET_CONTAINER_MultiHashMap *clients;
 
-struct RouteList
-{
-	struct GNUNET_SCRB_RoutePath* path;
-	struct RoutePath* prev;
-	struct RoutePath* next;
-};
-
 struct NodeHandle
-{
-  /**
-   * list of routes
-   */
-  struct RouteList* rl_head;
-  struct RouteList* rl_tail;
-  
+{  
   struct GNUNET_PeerIdentity* peer;
   struct CNUNET_HashCode* peer_hash;
   struct Channel* chn;
@@ -326,14 +320,6 @@ group_client_send_message(const struct Group* grp,
 						  const struct GNUNET_MessageHeader* msg);
 
 /**
- * Send message to all clients connected to the group
- */
-static void
-group_children_send_message(const struct Group* grp,
-							const struct GNUNET_MessageHeader* msg);
-
-
-/**
  * A helper method for adding @a child to a group with
  * @a grp_key.
  * @param grp_key
@@ -352,31 +338,6 @@ group_child_add_helper(const struct GNUNET_SCRB_Policy* policy,
  */
 struct NodeHandle*
 dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg);
-
-/**
- * Updates the group map.
- *
- * 1.for all children
- * 1.1  for all paths
- *    1.1.1 if path_path
- *       1.1.1.1 return group_replace_path
- * 2. return 0
- */
-int
-group_update_map(struct Group* grp,
-				 struct GNUNET_PeerIdentity* path,
-				 unsigned int path_length);
-
-int
-route_replace_path(struct GNUNET_SCRB_RoutePath* path,
-				   struct GNUNET_PeerIdentity* path,
-				   unsigned int path_length);
-
-struct GNUNET_PeerIdentity*
-path_path(struct GNUNET_PeerIdentity* path,
-		  unsigned int path_length,
-		  struct GNUNET_PeerIdentity* n_path,
-		  unsigned int n_path_length);
 
 struct Client
 {
@@ -870,13 +831,15 @@ enum FOpResult
  * f.1 group is created
  *   f.1.1 check if the source node is already on the path
  *   f.1.2 check if we already have the child
+ *     f.1.2.1 update global view
  *   f.1.3 check if any of the children are on the path
  *   f.1.4 if policy accepts
  *     f.1.4.1 add child
  *     f.1.4.2 send parent
- *     f.1.4.3 if group is ack
- *       f.1.4.3.1 send ack to node
- *       f.1.4.3.2 update clients
+ *     f.1.4.3 update global view
+ *     f.1.4.4 if group is ack
+ *       f.1.4.4.1 send ack to node
+ *       f.1.4.4.2 update clients
  *   f.1.5 policy does not accept
  *     f.1.5.1 if group is ack
  *       f.1.5.2 send anycast to children
@@ -885,6 +848,7 @@ enum FOpResult
  *   f.2.2 if policy accepts node
  *     f.2.2.1 add child
  *     f.2.2.2 send parent
+ *     f.2.2.3 update global view
  *   f.2.3 policy does not accept
  *     f.2.3.1 send fail
  *   
@@ -958,8 +922,9 @@ forward_join(const struct GNUNET_HashCode* key,
 				  "The node %s is already in group %s.\n",
 				  GNUNET_h2s (lp_hash),
 				  GNUNET_h2s (grp->pub_key_hash));
-	  //update map
-	  group_update_map(grp, path, path_length);
+	  //f.1.2.1 update map
+	  if(NULL != route_map->map_put_path_cb)
+		  route_map->map_put_path_cb(route_map, grp->pub_key_hash, path, path_length, NULL);
 	  return CHECK_FAIL;
 	}
 	//f.1.3 check if any of the children are on the path
@@ -993,10 +958,12 @@ forward_join(const struct GNUNET_HashCode* key,
 		//f.1.4.2 send parent
 		cadet_send_parent (grp, lp);
 	  }
-	  
+	  //f.1.4.3 update global view
+	  if(NULL != route_map->map_put_path_cb)
+		  route_map->map_put_path_cb(route_map, grp->pub_key_hash, path, path_length, NULL);
 	  if(grp->is_acked)
 	  {
-		//f.1.4.3.1 send ack to node
+		//f.1.4.4.1 send ack to node
 		cadet_send_subscribe_ack(lp,
 								 &join_block->src,
 								 path_to_root->path,
@@ -1004,7 +971,7 @@ forward_join(const struct GNUNET_HashCode* key,
 								 path,
 								 path_length,
 								 0);//set offset to 0
-		//f.1.4.3.2 send child add to clients
+		//f.1.4.4.2 send child add to clients
 		client_send_child_change_event (grp, lp->peer, 1);
 
 		return SUBSCRIBE_ACK;
@@ -1101,6 +1068,9 @@ forward_join(const struct GNUNET_HashCode* key,
 		//path is not created, the message goes further
 		//f.2.2.2 send parent
 		cadet_send_parent (grp, lp);
+		//f.2.2.3 update global view
+		if(NULL != route_map->map_put_path_cb)
+		  route_map->map_put_path_cb(route_map, grp->pub_key_hash, path, path_length, NULL);
 		return WAIT_ACK;
 	  }
 		
@@ -2889,49 +2859,6 @@ dstrm_msg_get_next(struct GNUNET_SCRB_DownStreamMessage* msg)
 	child = group_children_get(grp, next);
 	return child;
 };
-
-int
-group_update_map(struct Group* grp,
-				 struct GNUNET_PeerIdentity* path,
-				 unsigned int path_length)
-{
-	struct NodeList* nl = grp->nl_head;
-	while(NULL != nl)
-	{
-	  if(1 == path_path(path, path_length, nl->node))
-	  {
-		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-					"Rejecting subsribe message for group %s, the child %s is already on the path.\n",
-					GNUNET_h2s (grp->pub_key_hash),
-					GNUNET_h2s (node->peer_hash));
-		return CHECK_FAIL;
-	  }
-	  nl = nl->next;
-	}
-}
-
-int
-route_replace_path(struct GNUNET_SCRB_RoutePath* path,
-				   struct GNUNET_PeerIdentity* path,
-				   unsigned int path_length)
-{
-}
-
-struct GNUNET_PeerIdentity*
-path_path(struct GNUNET_PeerIdentity* path,
-		  unsigned int path_length,
-		  struct GNUNET_PeerIdentity* n_path,
-		  unsigned int n_path_length)
-{
-	struct GNUNET_PeerIdentity* p = path + path_length - 1;
-	struct GNUNET_PeerIdentity* s = n_path + n_path_length - 1;
-	for(;p >= path && s >= n_path; p--, s-- )
-	{
-		if(0 != memcmp(*p, *s, sizeof(*s)))
-			return p;
-	}
-	return NULL;
-}
 
 /**
  * A client disconnected.  Remove all of its data structure entries.

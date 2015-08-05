@@ -103,20 +103,10 @@ struct GNUNET_SCRB_DownStreamMessage
   struct GNUNET_PeerIdentity src;
   
   /**
-   * The next peer
-   */
-  struct GNUNET_PeerIdentity next;
-  
-  /**
    * The destination address
    */
   struct GNUNET_PeerIdentity dst; 
 
-  /**
-   * Path to the destination beginning from the source
-   */
-  struct GNUNET_SCRB_RoutePath path;
-	
   /**
    * Content of the downstream message
    */	
@@ -153,7 +143,7 @@ struct GNUNET_SCRB_SubscribeAckMessage
   struct GNUNET_HashCode grp_key_hash;
 	
   /**
-   * Source of the message
+   * Initiator of the request
    */
   struct GNUNET_PeerIdentity requestor;
 };
@@ -177,6 +167,11 @@ struct GNUNET_SCRB_SubscribeFailMessage
    * Public group key hash
    */	
   struct GNUNET_HashCode grp_key_hash;
+  
+  /**
+   * Initiator of the request
+   */
+  struct GNUNET_PeerIdentity requestor;
 	
 };
 
@@ -209,14 +204,15 @@ struct GNUNET_SCRB_AnycastMessage
   struct GNUNET_SCRB_RoutePath to_visit;
   
 	/**
-	 * The message origin
+	 * The message center
 	 */
-  struct GNUNET_PeerIdentity orig;
-  
+  struct GNUNET_PeerIdentity wave_center;
   /**
-   * Path to originator of the message
+   * A secondary source
    */
-  struct GNUNET_SCRB_RoutePath path_to_orig;
+  struct GNUNET_PeerIdentity second_src;
+   
+  
 		
 };
 

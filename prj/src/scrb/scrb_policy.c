@@ -87,28 +87,33 @@ default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 {
 	
 	struct GNUNET_SCRB_RoutePath* to_visit = &msg.to_visit;
+	//merge previous nodes together with the new ones
 	struct GNUNET_PeerIdentity*
-		path = GNUNET_malloc((child_num + 1) * sizeof(struct GNUNET_PeerIdentity));
-	int path_length = child_num + 1;
+		merged = GNUNET_malloc((to_visit->path_length + child_num + 1) * sizeof(struct GNUNET_PeerIdentity));
+	int mrg_lng = to_visit->path_length + child_num + 1;
 	struct GNUNET_PeerIdentity* p;
-	for(p = path; p < path + child_num; p++)
+	if(NULL != to_visit->path)
+	{
+	  memcpy(merged, to_visit->path, to_visit->path_length * sizeof(struct GNUNET_PeerIdentity));
+	  GNUNET_free(to_visit->path);
+	}
+	//add children to the end of list
+	for(p = merged + to_visit->path_length; p < merged + to_visit->path_length + child_num; p++)
 	{
 		memcpy(p,*children++, sizeof(*p));
 	}
 	
-	shuffle(path, child_num);
+	shuffle(merged, mrg_lng - 1);
 
 	if(NULL != parent)
 	{
-		memcpy(++p, parent, sizeof(*p));
-		memcpy(to_visit->path, path, sizeof(*path));
-		to_visit->path_length = path_length;
+		memcpy(++p, parent, sizeof(*p));		
 	}else
 	{
-		--path_length;
-		memcpy(to_visit->path, path, child_num * sizeof(*p));
-		to_visit->path_length = path_length;
+		--mrg_lng;
 	}
+	to_visit->path = merged;
+  to_visit->path_length = mrg_lng;
 };
 
 /**

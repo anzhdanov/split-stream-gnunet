@@ -56,6 +56,10 @@ map_put_path_cb(void* cls, const struct GNUNET_HashCode* ph,
 /**
  * Default implementation of the #GNUNET_SCRB_MapPutPath
  *
+ * The map is formed when there is a subscribe request.
+ * The path is always goes from the requestor to the node
+ * where the path is inserted. 
+ *
  * @param route_map    View(map) of the sribe service
  * @param grp_key_hash A hash of the group public key for which the path is put
  * @param path         A sequence of peers
@@ -222,6 +226,11 @@ default_map_contain_path (struct GNUNET_SCRB_RouteMap* route_map,
 /**
  * A default implementation of #GNUNET_SCRB_MapGetPath.
  *
+ * A resulting path always contains the start and end nodes.
+ *
+ * For the downstream messages the destination node is @a start
+ * node and the source node is an @a end node.
+ *
  * @param route_map    View(map) of the sribe service
  * @param grp_key_hash Hash of the group public key for which the path is built
  * @param start        Start node of the path
@@ -299,14 +308,17 @@ find_path_helper(const struct Knot* start,
                 struct KnotList* kl_tail)
 {
   if(0 == memcmp(start, end, sizeof(struct Knot)))
+  {
+    GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, end);
     return 1;
+  }
    
   struct KnotList* kl = start->kl_head;
   while(NULL != kl)
   {
     if(1 == find_path_helper(kl->knot, end, kl_head, kl_tail)
     {
-      GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, kl);
+      GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, start);
       return 1;
     }
     kl = kl->next;

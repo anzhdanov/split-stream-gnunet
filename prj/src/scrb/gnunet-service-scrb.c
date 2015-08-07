@@ -443,7 +443,12 @@ put_dht_handler(enum GNUNET_DHT_RouteOption options,
 		return forward(options, data, path, path_length, groups);
 }
 
-
+/**
+ * d.1 call forward on the node
+ * d.2 if message is ours
+ *   d.2.1 update clients
+ * 
+ */
 uint8_t
 deliver(enum GNUNET_DHT_RouteOption options,
 		const void* data,
@@ -451,47 +456,24 @@ deliver(enum GNUNET_DHT_RouteOption options,
 		unsigned int path_length,
 		struct GNUNET_CONTAINER_MultiHashMap* groups) 
 {
-  //FIXME: check if our policy allows to take on the node
-  //if it does not, send SubscribeFail message to the source
-
-  //here we do the same operation as with forward
-  struct GNUNET_BLOCK_SCRB_Join*
-	join_block = (struct GNUNET_BLOCK_SCRB_Join*) data;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-			  "Deliver is called subsribing client %s for group %s.\n",
-			  GNUNET_h2s (&join_block->cl_pub_key_hash),
+	//d.1 call forward on the message content
+	forward(options, data, path, path_lenght, groups);
+	struct GNUNET_BLOCK_SCRB_Join*
+		join_block = (struct GNUNET_BLOCK_SCRB_Join*) data;
+    struct GNUNET_HashCode srch;
+	GNUNET_CRYPTO_hash(&join_block->src, sizeof(join_block->src), &srch);
+	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+			  "Deliver is called subsribing peer %s for group %s.\n",			  GNUNET_h2s (&srch),
 			  GNUNET_h2s (&join_block->gr_pub_key_hash));
-  //first check for necessary data structures
   struct Group*
 	grp = GNUNET_CONTAINER_multihashmap_get (groups, &pub_key_hash);
-  if(NULL == grp)
+  if(NULL != grp)
   {
-	grp = GNUNET_new(struct Group);
-	grp->pub_key = group_key;
-	grp->pub_key_hash = group_key_hash;
+	  //d.2 message is ours
+	  if(0 == memcmp(&join_block->src, &my_identity, sizeof(my_identity)))
+		  client_send_subscribe_ack(grp);//d.2.1 update clients
   }
-  //take the last peer on the path
-  struct GNUNET_PeerIdentity* lp = &path[path_length - 1];
-  //check if the previous peer is already in the
-  //children list
-  char hv_chld = 0;
-  struct NodeList* nl = grp->pnl_head;
-  while (NULL != nl)
-  {
-	if(0 == memcmp(nl->node->peer, lp , sizeof(struct GNUNET_PeerIdentity)))
-	{
-	  hv_chld = 1;
-	  break;
-	};
-	nl = nl->next;
-  }
-	
-  if(0 == hv_chld)
-  {
-	//create CADET channel to the previous peer on the path and
-	//send parent notification to the previous peer
-	cadet_send_parent (grp, &path[path_length - 1]);
-  }	
+  	
 }
 
 
@@ -513,20 +495,26 @@ enum FOpResult
  *   f.1.3 check if any of the children are on the path
  *   f.1.4 if policy accepts
  *     f.1.4.1 add child
- *     f.1.4.2 send parent
- *     f.1.4.3 update global view
- *     f.1.4.4 if group is ack
- *       f.1.4.4.1 send ack to node
- *       f.1.4.4.2 update clients
+ *     f.1.4.2 update global view
+ *     f.1.4.3 if group is ack
+ *       f.1.4.3.1 send ack to node
+ *       f.1.4.3.2 update clients
  *   f.1.5 policy does not accept
  *     f.1.5.1 if group is ack
  *       f.1.5.2 send anycast to children
  * f.2 group is not created 
  *   f.2.1 create group
+ *   f.2.2 if last hop
+ *     f.2.2.1 set group acked
+ *     f.2.2.2 set group root
+ *     f.2.2.3 set path to root
  *   f.2.2 if policy accepts node
  *     f.2.2.1 add child
  *     f.2.2.2 send parent
  *     f.2.2.3 update global view
+ *     f.2.2.4 if group is acked
+ *       f.2.2.4.1 send subscribe ack
+ *       f.2.2.4.2 update clients
  *   f.2.3 policy does not accept
  *     f.2.3.1 send fail
  *   
@@ -627,30 +615,26 @@ forward(enum GNUNET_DHT_RouteOption options,
 				  GNUNET_h2s (grp->pub_key_hash));
 	  //f.1.4.1
 	  //here, provide the last on the path to build the group
-	  if(NULL != group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp))
-	  {
-		//the group was implicitly created
-		//send parent, do not send ack since the full
-		//path is not created, the message goes further
-		//f.1.4.2 send parent
-		cadet_send_parent (grp, lp);
-	  }
-	  //f.1.4.3 update global view
+	  group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp);
+	  //f.1.4.2 update global view
 	  if(NULL != route_map->map_put_path_cb)
 		  route_map->map_put_path_cb(route_map, grp->pub_key_hash, path, path_length, NULL);
+	  // f.1.4.3 if group is ack
 	  if(grp->is_acked)
 	  {
-		//f.1.4.4.1 send ack to node
+		//f.1.4.3.1 send ack to node
 		cadet_send_subscribe_ack(lp,
 								 &my_identity,
 								 &join_block->src,
 								 path_to_root->path,
 								 path_to_root->path_length);
-		//f.1.4.4.2 send child add to clients
+		//f.1.4.3.2 send child add to clients
 		client_send_child_change_event (grp, lp->peer, 1);
 
 		return SUBSCRIBE_ACK;
 	  }
+	  
+	  return WAIT_ACK;
 
 	}else if(1 == grp->is_acked)//f.1.5.(1) policy does not accept (group is acked)
 	{
@@ -725,14 +709,31 @@ forward(enum GNUNET_DHT_RouteOption options,
 	  //here, provide the last on the path to build the group
 	  if(NULL != (grp = group_child_add_helper(policy, grp_pub_key, grp_pub_key_hash, lp)))
 	  {
+		  //f.2.2 if last hop
+		if (0 != (options & GNUNET_DHT_RO_LAST_HOP))
+		{
+			grp->is_acked = 1;//f.2.2.1 set group acked
+			grp->is_root = 1;
+			path_to_root.path = GNUNET_malloc(path_length * sizeof(*path));
+			memcpy(path_to_root.path, path, path_length * sizeof(*path));
+			path_to_root.path_length = path_length;
+		}
 		//the group was implicitly created
-		//send parent, do not send ack since the full
-		//path is not created, the message goes further
 		//f.2.2.2 send parent
 		cadet_send_parent (grp, lp);
 		//f.2.2.3 update global view
 		if(NULL != route_map->map_put_path_cb)
 		  route_map->map_put_path_cb(route_map, grp->pub_key_hash, path, path_length, NULL);
+		//f.2.2.4
+		if(1 == grp->is_acked)
+		{
+			 cadet_send_subscribe_ack (lp,
+								 &my_identity,
+								 &join_block->src,
+								 path, path_length); // we are at the root
+			 return SUBSCRIBE_ACK;
+		}
+		
 		return WAIT_ACK;
 	  }
 		
@@ -750,9 +751,7 @@ forward(enum GNUNET_DHT_RouteOption options,
 
 	  cadet_send_subscribe_fail (lp,
 								 &my_identity,
-								 source,
-								 path, path_length,
-								 0);//we send, no offset
+								 source);
 	}
   }
 }
@@ -1414,7 +1413,7 @@ recv_direct_anycast_handler(void* cls,
 	//we have received the join put
 	//   a.2.1.1 call put dht handler on the anycast message content
 	struct PutJoin* put = (struct PutJoin*)content->data;
-	put_dht_handler(put->options, put->data, put->path.path, put->path. path_length, groups);
+	forward(put->options, put->data, put->path.path, put->path. path_length, groups);
   }else // a.2.2 else
   {
 	  // a.2.2.1 send anycast content to clients
@@ -1533,23 +1532,21 @@ cadet_recv_anycast_fail(void* cls,
 	//FIXME: here should be some necessary security checks
 	struct Group*
 	  grp = GNUNET_CONTAINER_multihashmap_get (groups, &msg->grp_key_hash);
-	if(NULL == grp)
+	if(NULL != grp)
 	{
-	  return 0;
-	}
-	struct GNUNET_HashCode srch;
-	GNUNET_CRYPTO_hash(&msg->src, sizeof(&msg->src), &srch);
-	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+		struct GNUNET_HashCode srch;
+		GNUNET_CRYPTO_hash(&msg->src, sizeof(&msg->src), &srch);
+		GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 					"Receive anycast fail from %s for group %s.\n",
 				    GNUNET_h2s (&srch),
 					GNUNET_h2s (grp->pub_key_hash));
 	
-	if(NULL != policy->recv_anycast_fail_cb)
-		policy->recv_anycast_fail_cb(policy,
-									 &msg->group_key,
-									 &msg->src,
-									 &msg->content);
-	
+		if(NULL != policy->recv_anycast_fail_cb)
+			policy->recv_anycast_fail_cb(policy,
+										 &msg->group_key,
+										 &msg->src,
+										 &msg->content);
+	}
   }
 
 /**

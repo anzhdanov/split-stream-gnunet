@@ -203,18 +203,74 @@ struct GNUNET_SCRB_AnycastMessage
    */
   struct GNUNET_SCRB_RoutePath to_visit;
   
-	/**
-	 * The message center
-	 */
-  struct GNUNET_PeerIdentity wave_center;
   /**
-   * A secondary source
+   * Path to requestor
    */
-  struct GNUNET_PeerIdentity second_src;
-   
+  struct GNUNET_SCRB_RoutePath pth_to_rq;
   
-		
+  /**
+   * Source of the subscribe request
+   */
+  struct GNUNET_PeerIdentity ssrc;
+  
+  /**
+   * Source of the anycast message
+   */
+  struct GNUNET_PeerIdentity asrc;
+  
+  /**
+   * Initial source of the anycast message
+   */
+  struct GNUNET_PeerIdentity iasrc;  	
 };
+
+struct GNUNET_SCRB_ClientAnycastMessage
+{
+  /**
+   * Header of the message
+   */
+  struct GNUNET_SCRB_MessageHeader header;
+	
+  /**
+   * Public key of the group the message is anycasted
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey group_key;
+	
+  /**
+   * Anycast message content
+   */	
+  struct GNUNET_SCRB_Content content;
+  
+  /**
+   * Source of the message
+   */
+  struct GNUNET_PeerIdentity src; 
+
+};
+
+struct GNUNET_SCRB_AnycastFailMessage
+{
+  /**
+   * Header of the message
+   */
+  struct GNUNET_SCRB_MessageHeader header;
+	
+  /**
+   * Public key of the group the message is anycasted
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey group_key;
+	
+  /**
+   * Anycast message content
+   */	
+  struct GNUNET_SCRB_Content content;
+  
+  /**
+   * Source of the message
+   */
+  struct GNUNET_PeerIdentity src; 
+};
+
 
 struct GNUNET_SCRB_ChildChangeEventMessage
 {

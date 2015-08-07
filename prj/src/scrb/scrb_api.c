@@ -126,7 +126,8 @@ client_recv_anycast (void *cls,
 {
 	struct GNUNET_SCRB_Client *
 		sclient = GNUNET_CLIENT_MANAGER_get_user_context_ (client, sizeof(*sclient));
-	struct GNUNET_SCRB_AnycastMessage* amsg = (struct GNUNET_SCRB_AnycastMessage*)msg;
+	struct GNUNET_SCRB_ClientAnycastMessage* 
+	  amsg = (struct GNUNET_SCRB_ClientAnycastMessage*)msg;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 				"Calling anycast message callback with a message of size %u.\n",
 				ntohs(amsg->header.header.size));

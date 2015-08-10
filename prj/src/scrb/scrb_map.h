@@ -1,9 +1,3 @@
-/*
- * scrb_map.h
- *
- *  Created on: Aug 3, 2015
- *      Author: azhdanov
- */
 
 #ifndef MAP_H_
 #define MAP_H_
@@ -107,5 +101,21 @@ GNUNET_SCRB_create_route_map(GNUNET_SCRB_MapPutPath map_put_path_cb,
 
 struct GNUNET_SCRB_RouteMap*
 GNUNET_SCRB_create_route_map_def();
+
+/**
+ * Handle for the route map
+ */
+struct GNUNET_SCRB_RouteMap
+{
+  struct GNUNET_CONTAINER_MultiHashMap* map;
+  
+	GNUNET_SCRB_MapPutPath map_put_path_cb;
+	GNUNET_SCRB_MapRemovePath map_remove_path_cb;
+	GNUNET_SCRB_MapContainPath map_contain_path_cb;
+	GNUNET_SCRB_MapGetPath map_get_path_cb;
+	
+	void* cls;
+		
+};
 
 #endif

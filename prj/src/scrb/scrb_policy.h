@@ -1,19 +1,15 @@
-/*
- * scrb_policy.h
- *
- *  Created on: Jun 6, 2014
- *      Author: azhdanov
- */
-
 #ifndef POLICY_H_
 #define POLICY_H_
+
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * Policy type
  */
 enum GNUNET_SCRB_PolicyType
 {
-	DEFAULT, LIMITED
+  DEFAULT, LIMITED
 };
 
 /**
@@ -32,10 +28,11 @@ enum GNUNET_SCRB_PolicyType
  */
 typedef int 
 (*GNUNET_SCRB_PolicyAllowSubscribe) (const struct GNUNET_SCRB_Policy* policy,
-	const struct GNUNET_PeerIdentity* source,
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
-	const struct GNUNET_SCRB_Content* content,
-	void* cls);
+									 const struct GNUNET_PeerIdentity* source,
+									 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+									 const struct GNUNET_CONTAINER_MultiHashMap* groups,
+									 const struct GNUNET_SCRB_Content* content,
+									 void* cls);
 
 /**
  * The method is called when an anycast received which is not satisfied
@@ -52,11 +49,11 @@ typedef int
  */
 typedef void
 (*GNUNET_SCRB_PolicyDirectAnycast) (const struct GNUNET_SCRB_Policy* policy,
-	struct GNUNET_SCRB_AnycastMessage* msg,
-	const struct GNUNET_PeerIdentity* parent,
-	const struct GNUNET_PeerIdentity** children,
-	size_t child_num,
-	void* cls);
+									struct GNUNET_SCRB_AnycastMessage* msg,
+									const struct GNUNET_PeerIdentity* parent,
+									const struct GNUNET_PeerIdentity** children,
+									size_t child_num,
+									void* cls);
 
 /**
  * The method with the signature is called when it is necessary to get the
@@ -70,8 +67,8 @@ typedef void
  */
 typedef struct GNUNET_PeerIdentity*
 (*GNUNET_SCRB_PolicyGetNextAnycast) (const struct GNUNET_SCRB_Policy* policy,
-	struct GNUNET_SCRB_AnycastMessage* msg,
-	void* cls);
+									 struct GNUNET_SCRB_AnycastMessage* msg,
+									 void* cls);
 
 /**
  * Informs the @a policy that @a child was added to a group with the given
@@ -83,10 +80,10 @@ typedef struct GNUNET_PeerIdentity*
  * @param cls        Closure
  */
 typedef void
-(*GNUNET_SCRB_PolicyChildAdded) (const struct GNUNET_SCRB_Policy* policy
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
-	const struct GNUNET_PeerIdentity* child,
-	void* cls);
+(*GNUNET_SCRB_PolicyChildAdded) (const struct GNUNET_SCRB_Policy* policy,
+								 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+								 const struct GNUNET_PeerIdentity* child,
+								 void* cls);
 
 /**
  * Informs the @a policy that @a child was removed from a group with the given
@@ -98,10 +95,10 @@ typedef void
  * @param cls        Closure
  */
 typedef void
-(*GNUNET_SCRB_PolicyChildRemoved) (const struct GNUNET_SCRB_Policy* policy
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
-	const struct GNUNET_PeerIdentity* child,
-	void* cls);
+(*GNUNET_SCRB_PolicyChildRemoved) (const struct GNUNET_SCRB_Policy* policy,
+								   const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
+								   const struct GNUNET_PeerIdentity* child,
+								   void* cls);
 
 /**
  * Notifies the policy about a failure for an anycast
@@ -114,10 +111,10 @@ typedef void
  */
 typedef void
 (*GNUNET_SCRB_PolicyRecvAnycastFail) (const struct GNUNET_SCRB_Policy* policy,
-	const struct GNUNET_CRYPTO_PublicKey* group_key,	
-	const struct GNUNET_PeerIdentity* failed_at_node,
-	const struct GNUNET_SCRB_Content* content,
-	void* cls);
+									  const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,	
+									  const struct GNUNET_PeerIdentity* failed_at_node,
+									  const struct GNUNET_SCRB_Content* content,
+									  void* cls);
 
 /**
  * Creates a scribe policy with parameters specified in the call
@@ -144,5 +141,30 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
  */
 struct GNUNET_SCRB_Policy*
 GNUNET_SCRB_create_default_policy();
+
+/**
+ * Handle for the scribe policy
+ */
+struct GNUNET_SCRB_Policy
+{	
+	/**
+	 * The policy type
+	 */
+	enum GNUNET_SCRB_PolicyType type;
+	
+	GNUNET_SCRB_PolicyAllowSubscribe allow_subs_cb;
+	GNUNET_SCRB_PolicyDirectAnycast  direct_anycst_cb;
+	GNUNET_SCRB_PolicyChildAdded     child_added_cb;
+	GNUNET_SCRB_PolicyChildRemoved   child_removed_cb;
+	GNUNET_SCRB_PolicyRecvAnycastFail recv_anycst_fail_cb;
+	GNUNET_SCRB_PolicyGetNextAnycast  get_next_anycst_cb;
+	void* cls;
+	/**
+	 * A maximum number of children
+	 */
+	uint64_t max_children;
+		
+};
+
 
 #endif

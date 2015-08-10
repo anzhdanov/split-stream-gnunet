@@ -1,22 +1,6 @@
 #include "scrb_map.h"
 #include <gnunet/gnunet_util_lib.h>
 
-/**
- * Handle for the route map
- */
-struct GNUNET_SCRB_RouteMap
-{
-  struct GNUNET_CONTAINER_MultiHashMap* map;
-  
-	GNUNET_SCRB_MapPutPath map_put_path_cb;
-	GNUNET_SCRB_MapRemovePath map_remove_path_cb;
-	GNUNET_SCRB_MapContainPath map_contain_path_cb;
-	GNUNET_SCRB_MapGetPath map_get_path_cb;
-	
-	void* cls;
-		
-};
-
 struct KnotList;
 
 struct Knot

@@ -1,30 +1,4 @@
 #include "scrb_policy.h"
-#include <stdlib.h>
-#include <string.h>
-
-/**
- * Handle for the scribe policy
- */
-struct GNUNET_SCRB_Policy
-{	
-	/**
-	 * The policy type
-	 */
-	enum GNUNET_SCRB_PolicyType type;
-	
-	GNUNET_SCRB_PolicyAllowSubscribe allow_subs_cb;
-	GNUNET_SCRB_PolicyDirectAnycast  direct_anycst_cb;
-	GNUNET_SCRB_PolicyChildAdded     child_added_cb;
-	GNUNET_SCRB_PolicyChildRemoved   child_removed_cb;
-	GNUNET_SCRB_PolicyRecvAnycastFail recv_anycst_fail_cb;
-	GNUNET_SCRB_PolicyGetNextAnycast  get_next_anycst_cb;
-	void* cls;
-	/**
-	 * A maximum number of children
-	 */
-	uint64_t max_children;
-		
-};
 
 struct PeerList
 {
@@ -114,7 +88,7 @@ default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	}
 	to_visit->path = merged;
   to_visit->path_length = mrg_lng;
-};
+}
 
 /**
  * Returns the next peer to anycast according to the @a policy

@@ -55,7 +55,7 @@ void
 default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	struct GNUNET_SCRB_AnycastMessage* msg,
 	const struct GNUNET_PeerIdentity* parent,
-	const struct GNUNET_PeerIdentity** children,
+	struct GNUNET_PeerIdentity** children,
 	size_t child_num,
 	void* cls)
 {

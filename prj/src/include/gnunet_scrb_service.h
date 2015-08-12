@@ -142,9 +142,9 @@ struct GNUNET_SCRB_RoutePath
 
 
 /**
- * Functions with the signature are called when an anycast is received for @a topic
- * which this client is interested in. The client should return whether or not
- * the anycast should continue.
+ * Functions with the signature are called when an anycast is received for the group
+ * which this client is subscribed. The client should return whether or not the
+ * anycast should continue.
  *
  * @param cls        The callback closure
  * @param group_key  Public key of the group the message was anycasted for
@@ -170,7 +170,7 @@ typedef void
 
 /**
  * Functions with the signature are called which informs the client that
- * @a child is added to @a topic in which it is interested in.
+ * @a child is added to the @a group which the client is subscribed.
  *
  * @param group_key  Public key of group the client is interested in
  * @param child      Identity of the child that was added
@@ -206,24 +206,13 @@ typedef void
 
 /**
  * Functions with the signature are called which informs the client that
- * a subscribe on the given @a topic is successfull.
+ * a subscription to the group with the given @a group_key is successfull.
  *
  * @param group_key    Public key of the group the subscribe operation is successfull
  */
 typedef void
 (*GNUNET_SCRB_ClientSubscribeSuccessCallback)(void* cls,
 											  const struct GNUNET_CRYPTO_EddsaPublicKey* group_key);
-
-/**
- * Functions with the signature are called when the client gets a response
- * for the service request
- *
- * @param cls    Operations closure
- * @param msg    Result of the request
- */
-typedef void
-(*GNUNET_SCRB_RequestResultCallback)(void* cls,
-									 const struct GNUNET_SCRB_MessageHeader* msg);
 
 /**
  * A contract for making a subscription.
@@ -241,9 +230,8 @@ typedef void
  * deletion of the group members using @a child_added_cb and @a child_del_cb
  * callbacks.
  *
- * The API does not have a particular create/destroy method. When a service 
- * receives a subscribe request for a group not yet created, it simply creates
- * the group and makes a subsrcription for the requestor.
+ * The API does not have a particular create/destroy group methods. The function-
+ * ality allows to create groups implicitly.
  *
  * @param cfg                   Configuration handle
  * @param pub_key               Public key of the group to be subscribed

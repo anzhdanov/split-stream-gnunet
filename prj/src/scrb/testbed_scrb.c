@@ -2,7 +2,6 @@
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <gnunet/gnunet_testbed_service.h>
-#include "handle.h"
 #include "../include/gnunet_scrb_service.h"
 #include "gnunet/gnunet_crypto_lib.h"
 #include "gnunet/gnunet_common.h"

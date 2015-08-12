@@ -157,8 +157,8 @@ typedef int
 									 const struct GNUNET_SCRB_Content* content);
 
 /**
- * Functions with the signature are called when a message is delivered for @a 
- * topic this client is interested in.
+ * Functions with the signature are called when a message is delivered for a group
+ * the client is subscribed.
  *
  * @param group_key  Public key of the group the message was published to
  * @param content    The content which was published
@@ -182,8 +182,8 @@ typedef void
 
 /**
  * Functions with the signature are called which informs the client that
- * @a child has been removed from a topic with @a topic_id in which it was
- * interested in.
+ * @a child has been removed from a group with @a group_key the client is
+ * subscribed.
  *
  * @param group_key  Public key of the group the client is interested in
  * @param child      Identity of the child that was removed
@@ -195,8 +195,8 @@ typedef void
 
 /**
  * Functions with the signature are called when it is necessary to inform the
- * client that a subscribe operation on the given @a topic failed. The client
- * should retry the subscribe request or take an appropriate action.
+ * client that a subscribe operation for a group with the given @a group_key
+ * failed. The client should retry the subscribe request or take an appropriate action.
  *
  * @param group_key      Public key of the group the subscribe operation failed
  */
@@ -241,7 +241,7 @@ typedef void
  * @param anycast_cb            The function is called when the client receives
  * an anycast message
  * @param deliver_cb            The function is called when the client receives
- * a message for the topic it is interested in
+ * a message for a group it is subscribed
  * @param child_added_cb        The function is called when the client recieves
  * a message about a new child joining the group
  * @param child_removed_cb      The function is called when the client recieves
@@ -325,7 +325,7 @@ struct GNUNET_SCRB_PublishTransmitHandle;
 struct GNUNET_SCRB_AnycastTransmitHandle;
 
 /**
- * Publishes @a content to the given @a topic.
+ * Publishes @a content to a group with the given @a group_key.
  *
  * @param cfg              Configuration handle
  * @param group_key        A public key of the group the content is published to
@@ -388,164 +388,6 @@ GNUNET_SCRB_anycast_hint(const struct GNUNET_CONFIGURATION_Handle *cfg,
 						 void* notify_cls,
 						 GNUNET_ContinuationCallback cont_cb, 
 						 void* cls);
-
-/* /\** */
-/*  * The function requests a root for a group with the given @a group_key  */
-/*  * */
-/*  * @param cfg         Configuration */
-/*  * @param topic       Topic in question */
-/*  * @param get_root_cb A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_root(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_CRYPTO_PublicKey* group_key, */
-/* 		GNUNET_RequestResultCallback get_root_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * The function requests whether the service is a root for a group with */
-/*  * the given @a group_key. */
-/*  * */
-/*  * @param cfg        Configuration */
-/*  * @param group_key  A public key of the group in question */
-/*  * @param is_root_cb A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_is_root(struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_CRYPTO_PublicKey* group_key, */
-/* 		GNUNET_RequestResultCallback is_root_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * The function requests children of a group with the given @a group_key. */
-/*  * */
-/*  * @param cfg           Configuration */
-/*  * @param group_key     A public key of the group */
-/*  * @param get_chldrn_cb A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_children(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_CRYPTO_PublicKey* group_key, */
-/* 		GNUNET_RequestResultCallback get_chldrn_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * Requests a parent node (peer) for a group with the provided @a group_key */
-/*  * */
-/*  * @param cfg         Configuration */
-/*  * @param group_key   A public key of the group */
-/*  * @param get_prnt_cb A callback for the request */
-/*  *\/ */
-/* void  */
-/* GNUNET_SCRB_get_parent(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_CRYPTO_PublicKey* group_key, */
-/* 		GNUNET_RequestResultCallback get_prnt_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * Requests from the service a list of public keys for groups the @a client */
-/*  * is subscribed to */
-/*  * */
-/*  * @param cfg    Configuration */
-/*  *  */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_topics(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		GNUNET_ContinuationCallback cont_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * Requests a number of children for the given @a topic */
-/*  * */
-/*  * @param cfg    Configuration */
-/*  * @param topic  Topic in question */
-/*  * @param cls    Closure */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_num_children(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_SCRB_Topic* topic, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * Requests clients connected to the local service */
-/*  * */
-/*  * @param cfg            Configuration */
-/*  * @param topic          Topic in question */
-/*  * @param get_clients_cb A callback for the request */
-/*  * @param cls            Closure */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_clients(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_SCRB_Topic* topic, */
-/* 		GNUNET_SCRB_RequestResultCallback get_clients_cb, */
-/* 		void* cls); */
-
-
-/* /\** */
-/*  * Requests the local service if it contains an entry for the given @a topic. */
-/*  * */
-/*  * @param cfg    Configuration */
-/*  * @param topic  Topic in question */
-/*  * @param cls    Closure */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_contains_topic(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_SCRB_Topic* topic, */
-/* 		GNUNET_SCRB_RequestResultCallback get_clients_cb, */
-/* 		void* cls); */
-
-
-/* /\** */
-/*  * Requests the local service if the given @a topic contains @a child */
-/*  * */
-/*  * @param cfg           Configuration */
-/*  * @param topic         Topic in question */
-/*  * @param child         Child in question */
-/*  * @param cont_child_cb The request callback */
-/*  * @param cls    Closure */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_contains_child(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 		const struct GNUNET_SCRB_Topic* topic, */
-/* 		const struct NodeHandle* child, */
-/* 		GNUNET_SCRB_RequestResultCallback cont_child_cb, */
-/* 		void* cls); */
-
-/* /\** */
-/*  * Requests the local service for the current policy */
-/*  * */
-/*  * @param cfg           Configuration */
-/*  * @param get_plcy_cb   A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_policy(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 					   GNUNET_SCRB_RequestResultCallback* get_plcy_cb, */
-/* 		               void* cls); */
-
-/* /\** */
-/*  * Sets the current policy for the scribe service */
-/*  * */
-/*  * @param cfg           Configuration */
-/*  * @param policy        A policy to be set on the service */
-/*  * @param get_plcy_cb   A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_set_policy(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 					   const struct GNUNET_SCRB_Policy* policy, */
-/* 					   GNUNET_SCRB_RequestResultCallback* set_plcy_cb, */
-/* 		               void* cls); */
-
-/* /\** */
-/*  * Requests the local service for the current environment */
-/*  * */
-/*  * @param cfg           Configuration */
-/*  * @param get_env_cb    A callback for the request */
-/*  *\/ */
-/* void */
-/* GNUNET_SCRB_get_environment(const struct GNUNET_CONFIGURATION_Handle *cfg, */
-/* 							GNUNET_SCRB_RequestResultCallback* get_env_cb, */
-/* 							void* cls); */
-
 
 #if 0                           /* keep Emacsens' auto-indent happy */
 {

@@ -21,15 +21,13 @@ struct PeerList
 int
 default_policy_allow_subscribe(const struct GNUNET_SCRB_Policy* policy,
 	const struct GNUNET_PeerIdentity* source,
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
+	const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 	const struct GNUNET_CONTAINER_MultiHashMap* groups,
 	const struct GNUNET_SCRB_Content* content,
 	void* cls)
 {
-	//1. As the first condition check if our group is acked
-	struct 
 	return 1;
-};
+}
 
 /**
  * Shuffles @a path in a random order
@@ -46,13 +44,13 @@ shuffle(struct GNUNET_PeerIdentity* path,
 		*(path + i) = *(path + r);
 		*(path + r) = temp;
 	}	
-};
+}
 
 /**
  * Copies @a children to the message in a random order and appends @a parent.
  */
 void
-default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
+default_policy_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	struct GNUNET_SCRB_AnycastMessage* msg,
 	const struct GNUNET_PeerIdentity* parent,
 	struct GNUNET_PeerIdentity** children,
@@ -60,7 +58,7 @@ default_direct_anycast(const struct GNUNET_SCRB_Policy* policy,
 	void* cls)
 {
 	
-	struct GNUNET_SCRB_RoutePath* to_visit = &msg.to_visit;
+	struct GNUNET_SCRB_RoutePath* to_visit = &msg->to_visit;
 	//merge previous nodes together with the new ones
 	struct GNUNET_PeerIdentity*
 		merged = GNUNET_malloc((to_visit->path_length + child_num + 1) * sizeof(struct GNUNET_PeerIdentity));
@@ -98,7 +96,7 @@ default_policy_get_next_anycast (const struct GNUNET_SCRB_Policy* policy,
 	struct GNUNET_SCRB_AnycastMessage* msg,
 	void* cls)
 {
-	struct GNUNET_SCRB_RoutePath* to_visit = &msg.to_visit;
+	struct GNUNET_SCRB_RoutePath* to_visit = &msg->to_visit;
 	struct GNUNET_PeerIdentity* next = NULL;
 	if(NULL != to_visit->path){
 		next = GNUNET_malloc(sizeof(*next));	
@@ -106,39 +104,39 @@ default_policy_get_next_anycast (const struct GNUNET_SCRB_Policy* policy,
 		int i;	
 		for(i = 1; i < to_visit->path_length; i++)
 			to_visit->path[i] = to_visit->path[i+1];
-		to_visit->path[to_visit->path_length - 1] = NULL;
+		GNUNET_realloc(to_visit->path, to_visit->path_length - 1);
 		to_visit->path_length--;
 	}
 	return next;	
-};
+}
 
 void
-default_policy_child_added (const struct GNUNET_SCRB_Policy* policy
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
+default_policy_child_added (const struct GNUNET_SCRB_Policy* policy,
+	const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 	const struct GNUNET_PeerIdentity* child,
 	void* cls)
 {
 	//TO-DO: implement
-};
+}
 
 void
-default_policy_child_removed (const struct GNUNET_SCRB_Policy* policy
-	const struct GNUNET_CRYPTO_PublicKey* group_key,
+default_policy_child_removed (const struct GNUNET_SCRB_Policy* policy,
+	const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 	const struct GNUNET_PeerIdentity* child,
 	void* cls)
 {
 	//TO-DO: implement
-};
+}
 
 void
 default_policy_recv_anycast_fail (const struct GNUNET_SCRB_Policy* policy,
-	const struct GNUNET_CRYPTO_PublicKey* group_key,	
+	const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,	
 	const struct GNUNET_PeerIdentity* failed_at_node,
 	const struct GNUNET_SCRB_Content* content,
 	void* cls)
 {
 	//TO-DO: implement
-};
+}
 
 /**
  * Creates a scribe policy with parameters specified in the call
@@ -172,7 +170,7 @@ GNUNET_SCRB_create_policy(enum GNUNET_SCRB_PolicyType type,
 	policy->get_next_anycst_cb = get_next_anycst_cb;
 	policy->cls = cls;	
 	return policy;
-};
+}
 
 struct GNUNET_SCRB_Policy*
 	GNUNET_SCRB_create_default_policy()
@@ -185,5 +183,5 @@ struct GNUNET_SCRB_Policy*
 					&default_policy_recv_anycast_fail, 
 					&default_policy_get_next_anycast, 
 					 NULL);
-};
+}
 

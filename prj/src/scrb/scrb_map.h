@@ -2,8 +2,10 @@
 #ifndef MAP_H_
 #define MAP_H_
 
-#include <gnunet/gnunet_crypto_lib.h>
-
+#include <stdint.h>
+#include "gnunet/platform.h"
+#include "gnunet/gnunet_crypto_lib.h"
+#include "gnunet/gnunet_util_lib.h"
 /**
  * A handle for a service view.
  */
@@ -79,7 +81,7 @@ typedef void
   const struct GNUNET_HashCode* grp_key_hash,
 	const struct GNUNET_PeerIdentity* start,
 	const struct GNUNET_PeerIdentity* end,
-	const struct GNUNET_PeerIdentity* path,
+	struct GNUNET_PeerIdentity* path,
 	unsigned int* path_length,
 	void* cls);
 

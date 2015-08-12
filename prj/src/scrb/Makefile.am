@@ -16,40 +16,21 @@ AM_CPPFLAGS = \
 
 lib_LTLIBRARIES = \
 	libgnunetscrb.la\
- 	libgnunetscrbblock.la\
- 	libgnunetscrbpolicy.la\
- 	libgnunetscrbmap.la
+ 	libgnunetscrbblock.la
 
 pkgcfgdir= $(prefix)/share/gnunet/config.d/
 
 libexecdir= $(prefix)/lib/gnunet/libexec/
 
 libgnunetscrb_la_SOURCES = \
-  scrb_api.c 
+  scrb_api.c \
+  scrb.h
 libgnunetscrb_la_LIBADD = \
-  -lgnunetutil
+  -lgnunetutil \
+  $(GN_LIBINTL) $(XLIB)
 libgnunetscrb_la_LDFLAGS = \
-  $(GNUNET_LDFLAGS)  $(WINFLAGS) \
+ $(GN_LIB_LDFLAGS)  $(WINFLAGS) \
   -version-info 0:0:0
-
-libgnunetscrbpolicy_la_SOURCES = \
-  scrb_policy.c
-libgnunetscrbpolicy_la_LIBADD = \
-  -lgnunetutil\
-  $(INTLLIBS)
-libgnunetscrbblock_la_LDFLAGS = \
-  $(GN_LIB_LDFLAGS) $(WINFLAGS) \
-  -version-info 1:0:0
-
-libgnunetscrbmap_la_SOURCES = \
-  scrb_map.c
-libgnunetscrbmap_la_LIBADD = \
-  -lgnunetutil\
-  $(INTLLIBS)
-libgnunetscrbmap_la_LDFLAGS = \
-  $(GN_LIB_LDFLAGS) $(WINFLAGS) \
-  -version-info 1:0:0
-
 
 libgnunetscrbblock_la_SOURCES = \
   scrb_block_lib.h
@@ -71,12 +52,12 @@ check_PROGRAMS = \
 TESTS = $(check_PROGRAMS)
 
 gnunet_service_scrb_SOURCES = \
+  scrb_policy.c scrb_policy.h\
+  scrb_map.c scrb_map.h\
   gnunet-service-scrb.c
 gnunet_service_scrb_LDADD = \
   -lgnunetutil -lgnunetcore -lgnunetdht -lgnunetstatistics -lgnunetcadet\
   libgnunetscrbblock.la \
-  libgnunetscrbpolicy.la \
-  libgnunetscrbmap.la \
   $(INTLLIBS) 
 gnunet_service_scrb_LDFLAGS = \
   $(GNUNET_LDFLAGS)  $(WINFLAGS) -export-dynamic 

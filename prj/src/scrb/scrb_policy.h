@@ -1,8 +1,14 @@
-#ifndef POLICY_H_
-#define POLICY_H_
+#ifndef SCRB_POLICY_H_
+#define SCRB_POLICY_H_
 
-#include <stdlib.h>
-#include <string.h>
+#include <stdint.h>
+#include "gnunet/platform.h"
+#include "gnunet/gnunet_crypto_lib.h"
+#include "gnunet/gnunet_util_lib.h"
+#include "../include/gnunet_scrb_service.h"
+#include "scrb.h"
+
+struct GNUNET_SCRB_Policy;
 
 /**
  * Policy type

@@ -28,8 +28,6 @@
 
 #include "../include/gnunet_scrb_service.h"
 #include <stdint.h>
-#include "scrb_publisher.h"
-#include "scrb_subscriber.h"
 #include <gnunet/gnunet_crypto_lib.h>
 
 GNUNET_NETWORK_STRUCT_BEGIN

@@ -233,11 +233,6 @@ static struct GNUNET_DHT_Handle *dht_handle;
  */
 static struct GNUNET_DHT_PutHandle *put_dht_handle;
 
-/**
- * Handle to DHT GET
- */
-static struct GNUNET_DHT_GetHandle *get_dht_handle;
-
 static struct GNUNET_DHT_MonitorHandle *monitor_handle;
 
 static struct GNUNET_CONTAINER_MultiHashMap *groups;
@@ -561,7 +556,8 @@ cadet_send_parent (struct Group* grp, const struct GNUNET_PeerIdentity* peer);
  * @param dst         Destination of the message
  */
 static void
-cadet_send_direct_anycast(struct GNUNET_SCRB_MessageHeader* m,
+cadet_send_direct_anycast(const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
+						  struct GNUNET_SCRB_MessageHeader* m,
 						  const struct GNUNET_PeerIdentity* src,
 						  const struct GNUNET_PeerIdentity* dst);
 /**
@@ -871,7 +867,7 @@ forward(enum GNUNET_DHT_RouteOption options,
 		memcpy(msg->content.data, put, sizeof(*put));
 		msg->content.data_size = sizeof(*put);
 		msg->content.type = DHT_PUT;
-		cadet_send_direct_anycast(&msg->header, &my_identity, next);
+		cadet_send_direct_anycast(&grp->pub_key, &msg->header, &my_identity, next);
 		return ANYCAST;
 	  }
 	}
@@ -913,6 +909,7 @@ forward(enum GNUNET_DHT_RouteOption options,
 
 	  cadet_send_subscribe_fail (grp, &my_identity,
 								 &source);
+	  return SUBSCRIBE_FAIL;
 	}
   }
 }
@@ -1137,19 +1134,33 @@ cadet_send_child_event_all (const struct Group* grp,
  * @param path_length Length of the path
  */
 static void
-cadet_send_downstream_msg (struct GNUNET_SCRB_MessageHeader* m,
+cadet_send_downstream_msg (const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
+						   struct GNUNET_SCRB_MessageHeader* m,
 						   enum GNUNET_SCRB_ContentType ct, 
 						   const struct GNUNET_PeerIdentity* src,
 						   const struct GNUNET_PeerIdentity* dst)
 {	
   struct GNUNET_SCRB_DownStreamMessage*
 	msg = GNUNET_malloc (sizeof(*msg));
+  struct GNUNET_HashCode gkh;
+  GNUNET_CRYPTO_hash(&msg->grp_key, sizeof(msg->grp_key), &gkh);
+  struct Group*
+	grp = GNUNET_CONTAINER_multihashmap_get (groups, &gkh);
+  if(NULL == grp)
+  {
+	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				"There is no group %s.\n",
+				GNUNET_h2s (&gkh));
+	return;
+  }
+
   msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_DWNSTRM_MSG);
   msg->header.header.size = htons(sizeof(*msg));
   //encapsulate a message
   memcpy(msg->content.data, m, sizeof(*m));
   msg->content.data_size = sizeof(*m);
   msg->content.type = ct;
+  memcpy(&msg->grp_key, grp_key, sizeof(*grp_key));
   memcpy(&msg->src, src, sizeof(*src));
   memcpy(&msg->dst, dst, sizeof(*dst));
   GNUNET_CRYPTO_hash_create_random(GNUNET_CRYPTO_QUALITY_WEAK, &msg->id);
@@ -1159,11 +1170,23 @@ cadet_send_downstream_msg (struct GNUNET_SCRB_MessageHeader* m,
 	cadet_send_msg(next->chn, &msg->header.header);
   }else
   {
-	//FIXME: log message
-	return;
+	//we do not see the path, send to parent
+	struct GNUNET_HashCode sh;
+	struct GNUNET_HashCode dh;
+	GNUNET_CRYPTO_hash(src, sizeof(*src), &sh);
+	GNUNET_CRYPTO_hash(dst, sizeof(*dst), &dh);
+	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				  "The local node do not see the path %s to %s for group %s.\n",
+				GNUNET_h2s (&sh),
+				GNUNET_h2s (&dh),
+				GNUNET_h2s (&grp->pub_key_hash));
+	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+				"Sending the message %p to parent %s.\n",
+				msg,
+				GNUNET_h2s (grp->parent->peer_hash));
+	cadet_send_msg(grp->parent->chn, &msg->header.header);
   }
 }
-
 
 /**
  * Sends a subscribe fail message for the given node
@@ -1183,7 +1206,7 @@ cadet_send_subscribe_fail (struct Group* grp,
   memcpy(&msg->requestor, dst, sizeof(*dst));
   memcpy(&msg->grp_key, &grp->pub_key, sizeof(grp->pub_key));
   memcpy(&msg->grp_key_hash, &grp->pub_key_hash, sizeof(grp->pub_key_hash));
-  cadet_send_downstream_msg (&msg->header, MSG, src, dst);
+  cadet_send_downstream_msg (&grp->pub_key, &msg->header, MSG, src, dst);
 }
 
 /**
@@ -1213,7 +1236,7 @@ cadet_send_subscribe_ack (struct Group* grp,
   msg->path_to_root.path_length = ptr_length;
   memcpy(&msg->grp_key, &grp->pub_key, sizeof(grp->pub_key));
   memcpy(&msg->grp_key_hash, &grp->pub_key_hash, sizeof(grp->pub_key_hash));
-  cadet_send_downstream_msg(&msg->header, MSG, src, dst);
+  cadet_send_downstream_msg(&grp->pub_key, &msg->header, MSG, src, dst);
 }
 
 /**
@@ -1235,12 +1258,13 @@ cadet_send_anycast_fail(struct Group* grp,
   memcpy(&msg->src, dst, sizeof(*dst));
   memcpy(&msg->group_key, &grp->pub_key, sizeof(grp->pub_key));
   memcpy(&msg->content, content, sizeof(*content));
-  cadet_send_downstream_msg (&msg->header, MSG, src, dst);
+  cadet_send_downstream_msg (&grp->pub_key, &msg->header, MSG, src, dst);
 }
 
 
 static void
-cadet_send_direct_anycast(struct GNUNET_SCRB_MessageHeader* m,
+cadet_send_direct_anycast(const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
+						  struct GNUNET_SCRB_MessageHeader* m,
 						  const struct GNUNET_PeerIdentity* src,
 						  const struct GNUNET_PeerIdentity* dst)
 {
@@ -1248,7 +1272,7 @@ cadet_send_direct_anycast(struct GNUNET_SCRB_MessageHeader* m,
 	msg = (struct GNUNET_SCRB_AnycastMessage*)m;
   msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_ANYCAST);
   msg->header.header.size = htons(sizeof(*msg));
-  cadet_send_downstream_msg (&msg->header, ANYCAST_MSG, src, dst);
+  cadet_send_downstream_msg (grp_key, &msg->header, ANYCAST_MSG, src, dst);
 }
 
 /**
@@ -1338,7 +1362,7 @@ recv_direct_anycast_handler(void* cls,
 				  GNUNET_h2s (&nh),
 				  GNUNET_h2s (&grp->pub_key_hash));
 	 
-	  cadet_send_direct_anycast(&new_msg->header, &my_identity, next);
+	  cadet_send_direct_anycast(&grp->pub_key, &new_msg->header, &my_identity, next);
 	  return;
 	}
   }
@@ -1386,6 +1410,7 @@ cadet_recv_child_change_event(void* cls,
 	}
 	group_client_send_message(grp, &new_msg->header.header);
   }
+  return GNUNET_OK;
 }
 
 /**
@@ -1430,6 +1455,7 @@ cadet_recv_anycast_fail(void* cls,
 								   &msg->src,
 								  &msg->content, NULL);
   }
+  return GNUNET_OK;
 }
 
 /**
@@ -1517,7 +1543,7 @@ cadet_recv_downstream_msg(void* cls,
 	//D.S.M.1.1 send the message down the stream
 	struct GNUNET_SCRB_MessageHeader* m = (struct GNUNET_SCRB_MessageHeader*)msg->content.data;
 	  //set our identity as the source
-	cadet_send_downstream_msg(m, msg->content.type, &my_identity, &msg->dst);
+	cadet_send_downstream_msg(&msg->grp_key, m, msg->content.type, &my_identity, &msg->dst);
 		
   }
   //D.S.M 2 extract contents
@@ -1885,8 +1911,6 @@ core_connected_cb(void* cls, const struct GNUNET_PeerIdentity *identity)
 								NULL);
 }
 
-
-
 /**
  * Free resources occupied by @a client.
  *
@@ -1968,25 +1992,6 @@ free_group(struct Group *grp)
   free_node(grp->root); //FIXME: add root identity handling
   GNUNET_free (grp);
 }
-
-/**
- * Free memory occupied by an entry in the client map.
- *
- * @param cls unused
- * @param key unused
- * @param value a `struct  GNUNET_SCRB_Group*`
- * @return #GNUNET_OK (continue to iterate)
- */
-static int
-cleanup_client (void *cls,
-				const struct GNUNET_HashCode *key,
-				void *value)
-{
-  struct Client *client = value;
-  free_client(client);
-  return GNUNET_OK;
-}
-
 
 /**
  * Free memory occupied by an entry in the group map.
@@ -2074,6 +2079,19 @@ group_children_clear(struct Group* grp)
 	GNUNET_free(nl->node->chn);
 	GNUNET_free(nl->node);
 	GNUNET_free (nl);
+  }
+}
+
+static void
+group_clients_clear(struct Group* grp)
+{
+  struct ClientList* cl;
+  while(NULL != (cl = grp->cl_head))
+  {
+	GNUNET_CONTAINER_DLL_remove (grp->cl_head,
+								 grp->cl_tail,
+								 cl);
+	GNUNET_free (cl);
   }
 }
 

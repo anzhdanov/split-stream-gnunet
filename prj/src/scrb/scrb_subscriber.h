@@ -1,48 +1,29 @@
-/*
- * ext_subscriber.h
- *
- *  Created on: May 30, 2014
- *      Author: root
+
+#ifndef SCRB_COMMON_H_
+#define SCRB_COMMON_H_
+
+enum GNUNET_SCRB_ContentType
+{
+  MSG, ANYCAST_MSG, MULTICAST_MSG, DHT_PUT
+};
+
+/**
+ * Content of a scribe message
  */
-
-#ifndef SCRB_SUBSCRIBER_H_
-#define SCRB_SUBSCRIBER_H_
-
-GNUNET_NETWORK_STRUCT_BEGIN
-
-struct GNUNET_SCRB_ServiceSubscription
+struct GNUNET_SCRB_Content
 {
-	/**
-	 * group id
-	 */
-	struct GNUNET_HashCode group_id;
-
-	struct GNUNET_SCRB_ServiceSubscriber* sub_head;
-
-	struct GNUNET_SCRB_ServiceSubscriber* sub_tail;
+  /**
+   * Data
+   */
+  char* data;
+  /**
+   * Size
+   */
+  size_t data_size;
+  /**
+   * Content type
+   */
+  enum GNUNET_SCRB_ContentType type;
 };
 
-
-struct GNUNET_SCRB_ServiceSubscriber
-{
-	/**
-	 * Client id
-	 */
-	struct GNUNET_HashCode cid;
-
-	/**
-	 * group id
-	 */
-	struct GNUNET_HashCode group_id;
-
-
-	struct GNUNET_SCRB_ServiceSubscriber *prev;
-
-	struct GNUNET_SCRB_ServiceSubscriber *next;
-
-};
-
-GNUNET_NETWORK_STRUCT_END
-
-
-#endif /* SCRB_SUBSCRIBER_H_ */
+#endif /* SCRB_COMMON_H_ */

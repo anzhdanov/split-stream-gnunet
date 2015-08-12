@@ -1,5 +1,4 @@
 #include "scrb_map.h"
-#include <gnunet/gnunet_util_lib.h>
 
 struct KnotList;
 
@@ -28,9 +27,9 @@ static int
 map_put_path_cb(void* cls, const struct GNUNET_HashCode* ph,
                 void* knot)
 {
-  const struct IteratorCls* ic = cls;
+  struct IteratorCls* ic = cls;
   struct Knot* kn = knot;
-  if(0 == memcmp(kn->grp_key_hash, &ic->grp_key_hash, sizeof(kn->grp_key_hash))
+  if(0 == memcmp(kn->grp_key_hash, &ic->grp_key_hash, sizeof(ic->grp_key_hash)))
   {
     ic->res = knot;
   }
@@ -58,16 +57,16 @@ default_map_put_path (struct GNUNET_SCRB_RouteMap* route_map,
 	unsigned int path_length,
 	void* cls)
 {
-  struct Knot* knot = NULL;
   struct Knot* prev = NULL;
   int i;
+  struct IteratorCls ic;
+  memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
   for(i = 0; i < path_length - 1; i++)
   {
-    struct GNUNET_PeerIdentity* peer = &path[i];
+    const struct GNUNET_PeerIdentity* peer = &path[i];
     struct GNUNET_HashCode* ph = GNUNET_malloc(sizeof(*ph));
-    GNUNET_CRYPTO_hash(start_peer, sizeof(*start_peer), ph);
-    struct IteratorCls ic;
-    memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
+    GNUNET_CRYPTO_hash(peer, sizeof(*peer), ph);
+    
     ic.res = NULL;
     if(NULL != route_map->map)
       GNUNET_CONTAINER_multihashmap_get_multiple(route_map->map, ph,
@@ -77,8 +76,8 @@ default_map_put_path (struct GNUNET_SCRB_RouteMap* route_map,
     if(NULL == knot)
     {
       knot = GNUNET_malloc(sizeof(*knot));
-      knot->peer = GNUNET_malloc(sizeof(*start_peer));
-      memcpy(knot->peer, start_peer, sizeof(*start_peer));
+      knot->peer = GNUNET_malloc(sizeof(*peer));
+      memcpy(knot->peer, peer, sizeof(*peer));
       knot->grp_key_hash = GNUNET_malloc(sizeof(*grp_key_hash));
       memcpy(knot->grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
       GNUNET_CONTAINER_multihashmap_put (route_map->map, ph, knot,
@@ -90,7 +89,7 @@ default_map_put_path (struct GNUNET_SCRB_RouteMap* route_map,
       struct KnotList* kl = prev->kl_head;
       while(NULL != kl)
       {
-        if(0 == memcmp(kl->knot, knot, sizeof(struct Knot))
+        if(0 == memcmp(kl->knot, knot, sizeof(struct Knot)))
           break;
         kl = kl->next;
       }
@@ -123,19 +122,20 @@ default_map_remove_path (struct GNUNET_SCRB_RouteMap* route_map,
 	unsigned int path_length,
 	void* cls)
 {
-  struct Knot* knot = NULL;
   struct Knot* prev = NULL;
+  
+  struct IteratorCls ic;
+  memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
+  
   int i;
   for(i = 0; i < path_length - 1; i++)
   {
-    struct GNUNET_PeerIdentity* peer = &path[i];
-    struct GNUNET_HashCode* ph = GNUNET_malloc(sizeof(*ph));
-    GNUNET_CRYPTO_hash(start_peer, sizeof(*start_peer), ph);
-    struct IteratorCls ic;
-    memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
+    const struct GNUNET_PeerIdentity* peer = &path[i];
+    struct GNUNET_HashCode ph;
+    GNUNET_CRYPTO_hash(peer, sizeof(*peer), &ph);
     ic.res = NULL;
     if(NULL != route_map->map)
-      GNUNET_CONTAINER_multihashmap_get_multiple(route_map->map, ph,
+      GNUNET_CONTAINER_multihashmap_get_multiple(route_map->map, &ph,
                                                  map_put_path_cb,
                                                  (void*)&ic);
     struct Knot* knot = ic.res;
@@ -145,7 +145,7 @@ default_map_remove_path (struct GNUNET_SCRB_RouteMap* route_map,
       struct KnotList* kl = prev->kl_head;
       while(NULL != kl)
       {
-        if(0 == memcmp(kl->knot, knot, sizeof(*knot))
+        if(0 == memcmp(kl->knot, knot, sizeof(*knot)))
         {
           GNUNET_CONTAINER_DLL_remove(prev->kl_head, prev->kl_tail, kl);
           break;
@@ -155,7 +155,7 @@ default_map_remove_path (struct GNUNET_SCRB_RouteMap* route_map,
     }
     if(NULL == knot->kl_head)//the knot does not have children
     {
-      GNUNET_CONTAINER_multihashmap_remove(route_map->map, ph, knot);
+      GNUNET_CONTAINER_multihashmap_remove(route_map->map, &ph, knot);
       GNUNET_free(knot->peer);
       GNUNET_free(knot->grp_key_hash);
       GNUNET_free(knot);
@@ -183,28 +183,59 @@ default_map_contain_path (struct GNUNET_SCRB_RouteMap* route_map,
 	void* cls)
 {
   struct Knot* knot = NULL;
-  struct Knot* prev = NULL;
+  struct IteratorCls ic;
+  memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
+  
   int i;
   for(i = 0; i < path_length - 1; i++)
   {
-    struct GNUNET_PeerIdentity* peer = &path[i];
-    struct GNUNET_HashCode* ph = GNUNET_malloc(sizeof(*ph));
-    GNUNET_CRYPTO_hash(start_peer, sizeof(*start_peer), ph);
-    struct IteratorCls ic;
-    memcpy(&ic.grp_key_hash, grp_key_hash, sizeof(*grp_key_hash));
+    const struct GNUNET_PeerIdentity* peer = &path[i];
+    struct GNUNET_HashCode ph;
+    GNUNET_CRYPTO_hash(peer, sizeof(*peer), &ph);
     ic.res = NULL;
     if(NULL != route_map->map)
-      GNUNET_CONTAINER_multihashmap_get_multiple(route_map->map, ph,
+      GNUNET_CONTAINER_multihashmap_get_multiple(route_map->map, &ph,
                                                  map_put_path_cb,
                                                  (void*)&ic);
-    struct Knot* knot = ic.res;
+    knot = ic.res;
     
     if(NULL == knot)
-      return 0;
-    
-    prev = knot;    
+      return 0;    
   }
   return 1;      
+}
+
+/**
+ * A recursive helper function to find a path
+ * depth-first
+ */
+int
+find_path_helper(struct Knot* start,
+                struct Knot* end,
+                struct KnotList* kl_head,
+                struct KnotList* kl_tail)
+{
+  if(0 == memcmp(start, end, sizeof(struct Knot)))
+  {
+	struct KnotList* el = GNUNET_malloc(sizeof(*el));
+	el->knot = end;
+    GNUNET_CONTAINER_DLL_insert(kl_head, kl_tail, el);
+    return 1;
+  }
+   
+  struct KnotList* kl = start->kl_head;
+  while(NULL != kl)
+  {
+    if(1 == find_path_helper(kl->knot, end, kl_head, kl_tail))
+    {
+	  struct KnotList* sl = GNUNET_malloc(sizeof(*sl));
+	  sl->knot = start;
+      GNUNET_CONTAINER_DLL_insert(kl_head, kl_tail, sl);
+      return 1;
+    }
+    kl = kl->next;
+  }
+  return 0;
 }
 
 /**
@@ -224,12 +255,12 @@ default_map_contain_path (struct GNUNET_SCRB_RouteMap* route_map,
  */
 void
 default_map_get_path (struct GNUNET_SCRB_RouteMap* route_map,
-  const struct GNUNET_HashCode* grp_key_hash,
-	const struct GNUNET_PeerIdentity* start,
-	const struct GNUNET_PeerIdentity* end,
-	const struct GNUNET_PeerIdentity* path,
-	unsigned int* path_length,
-	void* cls)
+					  const struct GNUNET_HashCode* grp_key_hash,
+					  const struct GNUNET_PeerIdentity* start,
+					  const struct GNUNET_PeerIdentity* end,
+					  struct GNUNET_PeerIdentity* path,
+					  unsigned int* path_length,
+					  void* cls)
 {
   struct Knot* sn;
   struct GNUNET_HashCode sph;
@@ -257,8 +288,8 @@ default_map_get_path (struct GNUNET_SCRB_RouteMap* route_map,
   if(NULL == en)
     return;
   
-  struct KnotList* kl_head;
-  struct KnotList* kl_tail;
+  struct KnotList* kl_head = NULL;
+  struct KnotList* kl_tail = NULL;
   
   find_path_helper(sn, en, kl_head, kl_tail);
   size_t size = 0;
@@ -279,38 +310,6 @@ default_map_get_path (struct GNUNET_SCRB_RouteMap* route_map,
     kl = kl->next;
   }  
 }
-
-
-/**
- * A recursive helper function to find a path
- * depth-first
- */
-int
-find_path_helper(const struct Knot* start,
-                const struct Knot* end,
-                struct KnotList* kl_head,
-                struct KnotList* kl_tail)
-{
-  if(0 == memcmp(start, end, sizeof(struct Knot)))
-  {
-    GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, end);
-    return 1;
-  }
-   
-  struct KnotList* kl = start->kl_head;
-  while(NULL != kl)
-  {
-    if(1 == find_path_helper(kl->knot, end, kl_head, kl_tail)
-    {
-      GNUNET_CONTAINER_DLL_insert(prev->kl_head, prev->kl_tail, start);
-      return 1;
-    }
-    kl = kl->next;
-  }
-  return 0;
-}
-
-
 
 /**
  * Creates a scribe route map
@@ -342,8 +341,8 @@ struct GNUNET_SCRB_RouteMap*
 GNUNET_SCRB_create_route_map_def()
 {
   return GNUNET_SCRB_create_route_map(&default_map_put_path,
-	            &default_map_remove_path,
-	            &default_map_contain_path,
-	            &default_map_get_path,
-						  NULL);  
+									  &default_map_remove_path,
+									  &default_map_contain_path,
+									  &default_map_get_path,
+									  (void*) NULL);  
 }

@@ -584,6 +584,14 @@ static void
 free_group(struct Group *group);
 
 /**
+ * Free resources occupied by @a client.
+ *
+ * @param client to free
+ */
+static void
+free_client (struct Client *client);
+
+/**
  * Task run during shutdown.
  *
  * @param cls unused
@@ -1865,7 +1873,7 @@ client_notify_disconnect(void* cls,
 	GNUNET_assert(0);
 	return;
   }
-	
+  
   struct GroupList* gl;
   struct Group* grp;
   struct ClientList* cl;
@@ -1898,6 +1906,7 @@ client_notify_disconnect(void* cls,
 	}
 	gl = gl->next;
   }
+  free_client(sclient);
 }
 
 static void

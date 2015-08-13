@@ -42,7 +42,7 @@ libgnunetscrbblock_la_LDFLAGS = \
   -version-info 1:0:0
  
 
-bin_PROGRAMS = gnunet-scrb testbed_scrb
+bin_PROGRAMS = gnunet-scrb #testbed_scrb
 
 libexec_PROGRAMS = gnunet-service-scrb
 
@@ -69,13 +69,13 @@ gnunet_scrb_LDADD = \
   $(INTLLIBS) \
   libgnunetscrb.la
  
-testbed_scrb_SOURCES = \
-  testbed_scrb.c
-testbed_scrb_LDADD = \
-  -lgnunetutil \
-  -lgnunettestbed \
-  $(INTLLIBS) \
-  libgnunetscrb.la
+#testbed_scrb_SOURCES = \
+#  testbed_scrb.c
+#testbed_scrb_LDADD = \
+#  -lgnunetutil \
+#  -lgnunettestbed \
+#  $(INTLLIBS) \
+#  libgnunetscrb.la
 
 test_scrb_api_SOURCES = \
  test_scrb_scrb.c

@@ -40,6 +40,9 @@
 #include "scrb_map.h"
 #include "scrb_policy.h"
 
+/**
+ * Node handle
+ */
 struct NodeHandle
 {  
   struct GNUNET_PeerIdentity* peer;
@@ -233,8 +236,14 @@ static struct GNUNET_DHT_Handle *dht_handle;
  */
 static struct GNUNET_DHT_PutHandle *put_dht_handle;
 
+/**
+ * Handle to DHT monitor
+ */
 static struct GNUNET_DHT_MonitorHandle *monitor_handle;
 
+/**
+ * Group map
+ */
 static struct GNUNET_CONTAINER_MultiHashMap *groups;
 
 /**
@@ -549,8 +558,9 @@ static void
 cadet_send_parent (struct Group* grp, const struct GNUNET_PeerIdentity* peer);
 
 /**
- * Sends a an anycast message to the provided @a dst
+ * Sends an anycast message to the provided @a dst
  *
+ * @param grp_key     Public key of the group
  * @param m           Message encapsulated inside anycast
  * @param src         Source of the subscribe message
  * @param dst         Destination of the message
@@ -1007,7 +1017,13 @@ client_send_anycast (struct Group* grp,
   group_client_send_message(grp, &cam->header.header);
 }
 
-
+/**
+ * Creates a CADET channel for the provided @a peer.
+ *
+ * @param grp        The group channel belongs to
+ * @param peer       Peer
+ * @return           struct Channel
+ */
 static struct Channel*
 cadet_channel_create(struct Group* grp, struct GNUNET_PeerIdentity *peer)
 {
@@ -1261,7 +1277,14 @@ cadet_send_anycast_fail(struct Group* grp,
   cadet_send_downstream_msg (&grp->pub_key, &msg->header, MSG, src, dst);
 }
 
-
+/**
+ * Sends an anycast message to the provided @a dst
+ *
+ * @param grp_key     Public key of the group
+ * @param m           Message encapsulated inside anycast
+ * @param src         Source of the subscribe message
+ * @param dst         Destination of the message
+ */
 static void
 cadet_send_direct_anycast(const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
 						  struct GNUNET_SCRB_MessageHeader* m,
@@ -1368,7 +1391,9 @@ recv_direct_anycast_handler(void* cls,
   }
 }
 
-
+/**
+ * Handler for an incoming child change message.
+ */
 int
 cadet_recv_child_change_event(void* cls, 
 							  struct GNUNET_CADET_Channel* channel,
@@ -1414,7 +1439,7 @@ cadet_recv_child_change_event(void* cls,
 }
 
 /**
- * 
+ * Handler for an incoming anycast fail message.
  */
 int
 cadet_recv_anycast_fail(void* cls, 
@@ -1655,7 +1680,6 @@ recv_subscribe_ack_handler(void* cls,
   }	 
 }
 
-
 /**
  * A subscribe request from the client
  * 
@@ -1759,7 +1783,7 @@ static const struct GNUNET_SERVER_MessageHandler server_handlers[] = {
 };
 
 /**
- *
+ * CADET handlers
  */
 static const struct GNUNET_CADET_MessageHandler cadet_handlers[] = {
   {&cadet_recv_downstream_msg, GNUNET_MESSAGE_TYPE_SCRB_DWNSTRM_MSG, 0},
@@ -1773,6 +1797,7 @@ static const struct GNUNET_CADET_MessageHandler cadet_handlers[] = {
  * Listening ports for cadet
  */
 static const uint32_t cadet_ports[] = {GNUNET_APPLICATION_TYPE_MULTICAST, 0};
+//FIXME: add scribe application type
 
 static void
 client_notify_connect(void* cls, struct GNUNET_SERVER_Client* client)
@@ -2343,7 +2368,7 @@ run (void *cls,
 
 
 /**
- * The main function for the ext service.
+ * The main function for the scrb service.
  *
  * @param argc number of arguments from the command line
  * @param argv command line arguments

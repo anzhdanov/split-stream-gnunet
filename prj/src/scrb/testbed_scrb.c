@@ -29,31 +29,31 @@ static int result;
  */
 struct SCRBPeer
 {
-	/**
-	 * Prev reference in DLL.
-	 */
-	struct SCRBPeer *prev;
+  /**
+   * Prev reference in DLL.
+   */
+  struct SCRBPeer *prev;
 
-	/**
-	 * Next reference in DLL.
-	 */
-	struct SCRBPeer *next;
+  /**
+   * Next reference in DLL.
+   */
+  struct SCRBPeer *next;
 
-	/**
-	 * Handle with testbed.
-	 */
-	struct GNUNET_TESTBED_Peer *guardian;
+  /**
+   * Handle with testbed.
+   */
+  struct GNUNET_TESTBED_Peer *guardian;
 
-	/**
-	 * Testbed operation to connect to SCRB service.
-	 */
-	struct GNUNET_TESTBED_Operation *scrb_op;
+  /**
+   * Testbed operation to connect to SCRB service.
+   */
+  struct GNUNET_TESTBED_Operation *scrb_op;
   /*
 	struct GNUNET_SCRB_Handle *scrb;
   */
   struct GNUNET_SCHEDULER_Task * join_task;
 
-	unsigned int id;
+  unsigned int id;
 
 };
 
@@ -82,20 +82,20 @@ shutdown_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   /*
 	struct SCRBPeer *peer;
 
-        shutdown_tid = NULL;
-        join_tid = NULL;
-        multicast_tid = NULL;
+	shutdown_tid = NULL;
+	join_tid = NULL;
+	multicast_tid = NULL;
 
 	for (peer=peer_head; NULL != peer; peer=peer->next)
 	{
-		if (NULL != peer->scrb_op)
-			GNUNET_TESTBED_operation_done (peer->scrb_op);
-		peer->scrb_op = NULL;
-                if (NULL != peer->join_task)
-                {
-                  GNUNET_SCHEDULER_cancel (peer->join_task);
-                  peer->join_task = NULL;
-                }
+	if (NULL != peer->scrb_op)
+	GNUNET_TESTBED_operation_done (peer->scrb_op);
+	peer->scrb_op = NULL;
+	if (NULL != peer->join_task)
+	{
+	GNUNET_SCHEDULER_cancel (peer->join_task);
+	peer->join_task = NULL;
+	}
 	}
 	result = GNUNET_OK;
 	GNUNET_SCHEDULER_shutdown (); /* Also kills the testbed */
@@ -105,17 +105,17 @@ static void
 join_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
   /*
-  struct SCRBPeer *peer = cls;
-  struct GNUNET_SCRB_Handle *scrb_handle = peer->scrb;
+	struct SCRBPeer *peer = cls;
+	struct GNUNET_SCRB_Handle *scrb_handle = peer->scrb;
 
-  GNUNET_assert (NULL != peer->join_task);
-  if(publisher_init == 1)
+	GNUNET_assert (NULL != peer->join_task);
+	if(publisher_init == 1)
     GNUNET_SCRB_subscribe(scrb_handle, &publisher, scrb_handle->cid, NULL, NULL);
   
-  peer->join_task = 
-      GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-                                    &join_task, peer);
-                                      */
+	peer->join_task = 
+	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
+	&join_task, peer);
+  */
 }
 
 static void
@@ -128,34 +128,34 @@ multicast_task (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 	strncpy (msg.data, "Hello World!!", sizeof (msg.data));
 	GNUNET_SCRB_request_multicast(scrb_handle, &publisher, &msg, NULL, NULL);
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-			&multicast_task, scrb_handle);
-			*/
+	&multicast_task, scrb_handle);
+  */
 }
 
 void continuation_leave_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 {
-	//leave the the group
-	/*
+  //leave the the group
+  /*
 	GNUNET_SCRB_request_leave(scrb_handle, scrb_handle->cid, NULL, NULL);
-	 */
+  */
 }
 
 void continuation_multicast_cb(struct GNUNET_SCRB_Handle* scrb_handle)
 {
   /*
 	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-			&multicast_task, scrb_handle);
-			*/
+	&multicast_task, scrb_handle);
+  */
 }
 
 void continuation_join_cb(void *cls, struct GNUNET_SCRB_Handle* scrb_handle)
 {
   /*
-  struct SCRBPeer *peer = cls;
+	struct SCRBPeer *peer = cls;
 
-  peer->join_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-			&join_task, peer);
-			*/
+	peer->join_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
+	&join_task, peer);
+  */
 }
 
 void continuation_create_cb(struct GNUNET_SCRB_Handle* scrb_handle)
@@ -163,10 +163,9 @@ void continuation_create_cb(struct GNUNET_SCRB_Handle* scrb_handle)
   /*
 	publisher = *scrb_handle->cid;
 	publisher_init = 1;
-	GNUNET_SCRB_request_create(scrb_handle, scrb_handle->cid, &continuation_multicast_cb, NULL);
-	//	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 20),
-	//				&create_task, scrb_handle);
-	*/
+	GNUNET_SCRB_request_create(scrb_handle, scrb_handle->cid, &continuation_multicast_cb, NULL);*/
+  //	GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 20),
+  //				&create_task, scrb_handle);
 }
 
 /**
@@ -182,35 +181,35 @@ void continuation_create_cb(struct GNUNET_SCRB_Handle* scrb_handle)
  */
 static void
 service_connect_pub (void *cls,
-		struct GNUNET_TESTBED_Operation *op,
-		void *ca_result,
-		const char *emsg)
+					 struct GNUNET_TESTBED_Operation *op,
+					 void *ca_result,
+					 const char *emsg)
 {
   /*
 	struct SCRBPeer* peer = cls;
-	peer->scrb = ca_result;
-	/* Service to DHT successful; here we'd usually do something
+	peer->scrb = ca_result;*/
+  /* Service to DHT successful; here we'd usually do something
      with the DHT (ok, if successful) */
-	/*
+  /*
 	GNUNET_log(GNUNET_ERROR_TYPE_DEBUG,
-			"Connecting to peer %s \n",
-			GNUNET_h2s (peer->scrb->cid));
+	"Connecting to peer %s \n",
+	GNUNET_h2s (peer->scrb->cid));
 
 	if(peer->id == 0)
-		GNUNET_SCRB_request_id(peer->scrb, &continuation_create_cb, peer);
+	GNUNET_SCRB_request_id(peer->scrb, &continuation_create_cb, peer);
 	else
-		GNUNET_SCRB_request_id(peer->scrb, &continuation_join_cb, peer);
+	GNUNET_SCRB_request_id(peer->scrb, &continuation_join_cb, peer);
   */
-	//	GNUNET_SCRB_request_create(ext_handle, peer->id);
+  //	GNUNET_SCRB_request_create(ext_handle, peer->id);
 
-	//	GNUNET_SCRB_subscribe(ext_handle, peer->id);
+  //	GNUNET_SCRB_subscribe(ext_handle, peer->id);
 
-	//	GNUNET_SCRB_request_multicast(ext_handle);
-	/* for now, just indiscriminately terminate after 10s */
-	//	GNUNET_SCHEDULER_cancel (shutdown_tid);
-	//	shutdown_tid = GNUNET_SCHEDULER_add_delayed
-	//			(GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
-	//					&shutdown_task, NULL);
+  //	GNUNET_SCRB_request_multicast(ext_handle);
+  /* for now, just indiscriminately terminate after 10s */
+  //	GNUNET_SCHEDULER_cancel (shutdown_tid);
+  //	shutdown_tid = GNUNET_SCHEDULER_add_delayed
+  //			(GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10),
+  //					&shutdown_task, NULL);
 }
 
 /**
@@ -230,8 +229,8 @@ service_connect_pub (void *cls,
 static void *
 scrb_connect (void *cls, const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-	/* Use the provided configuration to connect to service */
-	/*return GNUNET_SCRB_connect (cfg);*/
+  /* Use the provided configuration to connect to service */
+  /*return GNUNET_SCRB_connect (cfg);*/
 }
 
 
@@ -247,8 +246,8 @@ scrb_disconnect (void *cls, void *op_result)
 {
   /*
 	struct SCRBPeer *peer = cls;*/
-	/* Disconnect from SCRB service */
-	/*GNUNET_SCRB_disconnect ((struct GNUNET_SCRB_Handle *) op_result);
+  /* Disconnect from SCRB service */
+  /*GNUNET_SCRB_disconnect ((struct GNUNET_SCRB_Handle *) op_result);
 	peer->scrb = NULL;*/
 }
 
@@ -267,64 +266,64 @@ scrb_disconnect (void *cls, void *op_result)
  */
 static void
 test_master (void *cls,
-		struct GNUNET_TESTBED_RunHandle *h,
-		unsigned int num_peers,
-		struct GNUNET_TESTBED_Peer **peers,
-		unsigned int links_succeeded,
-		unsigned int links_failed)
+			 struct GNUNET_TESTBED_RunHandle *h,
+			 unsigned int num_peers,
+			 struct GNUNET_TESTBED_Peer **peers,
+			 unsigned int links_succeeded,
+			 unsigned int links_failed)
 {
   /*
 	if (NULL == peers)
 	{
-		GNUNET_SCHEDULER_add_now (&shutdown_task, NULL);
+	GNUNET_SCHEDULER_add_now (&shutdown_task, NULL);
 	}
 
 	guardians = peers;
 	struct SCRBPeer* current_peer;
 	unsigned int i;
 	for(i = 0; i < num_peers; i++){
-		current_peer = GNUNET_new(struct SCRBPeer);
-		current_peer->guardian = guardians[i];
-		current_peer->id = i;
-		current_peer->scrb_op = 
-				GNUNET_TESTBED_service_connect
-				(NULL,      /* Closure for operation */
-		//				peers[i],  /* The peer whose service to connect to */
-		//				"scrb",    /* The name of the service */
-		//				service_connect_pub, /* callback to call after a handle to
-    //                                            service is opened */
-		//				current_peer, /* closure for the above callback */
-		//				scrb_connect, /* callback to call with peer's
-    //                                  configuration; this should open the needed
-    //                                  service connection */
-	//					scrb_disconnect, /* callback to be called when closing the
-    //                                     opened service connection */
-		//				current_peer); /* closure for the above two callbacks */
-		//GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
-	//}
-	//shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_HOURS,
-	//		&shutdown_task, NULL);
+	current_peer = GNUNET_new(struct SCRBPeer);
+	current_peer->guardian = guardians[i];
+	current_peer->id = i;
+	current_peer->scrb_op = 
+	GNUNET_TESTBED_service_connect
+	(NULL,*/      /* Closure for operation */
+  //				peers[i],  /* The peer whose service to connect to */
+  //				"scrb",    /* The name of the service */
+  //				service_connect_pub, /* callback to call after a handle to
+  //                                            service is opened */
+  //				current_peer, /* closure for the above callback */
+  //				scrb_connect, /* callback to call with peer's
+  //                                  configuration; this should open the needed
+  //                                  service connection */
+  //					scrb_disconnect, /* callback to be called when closing the
+  //                                     opened service connection */
+  //				current_peer); /* closure for the above two callbacks */
+  //GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
+  //}
+  //shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_HOURS,
+  //		&shutdown_task, NULL);
 }
 
 
 int
 main (int argc, char **argv)
 {
-	int ret;
+  int ret;
 
-	result = GNUNET_SYSERR;
-	ret = GNUNET_TESTBED_test_run
-			("scrb-test",  /* test case name */
-					"test_scrb_peer1.conf", /* template configuration */
-					NUM_PEERS,       /* number of peers to start */
-					0LL, /* Event mask - set to 0 for no event notifications */
-					NULL, /* Controller event callback */
-					NULL, /* Closure for controller event callback */
-					&test_master, /* continuation callback to be called when testbed setup is
-                        complete */
-					NULL); /* Closure for the test_master callback */
-	if ( (GNUNET_OK != ret) || (GNUNET_OK != result) )
-		return 1;
-	return 0;
+  result = GNUNET_SYSERR;
+  ret = GNUNET_TESTBED_test_run
+	("scrb-test",  /* test case name */
+	 "test_scrb_peer1.conf", /* template configuration */
+	 NUM_PEERS,       /* number of peers to start */
+	 0LL, /* Event mask - set to 0 for no event notifications */
+	 NULL, /* Controller event callback */
+	 NULL, /* Closure for controller event callback */
+	 &test_master, /* continuation callback to be called when testbed setup is
+					  complete */
+	 NULL); /* Closure for the test_master callback */
+  if ( (GNUNET_OK != ret) || (GNUNET_OK != result) )
+	return 1;
+  return 0;
 }
 

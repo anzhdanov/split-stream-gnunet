@@ -19,16 +19,15 @@
 */
 
 /**
+ * @author Alexander Zhdanov
  * @file include/gnunet_scrb_service.h
  * @brief API to the scrb service
- * @author Xi
  */
+
 #ifndef GNUNET_SCRB_SERVICE_H
 #define GNUNET_SCRB_SERVICE_H
 
 #include "gnunet/gnunet_util_lib.h"
-#include "gnunet/gnunet_crypto_lib.h"
-#include "gnunet/gnunet_common.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -53,53 +52,15 @@ struct GNUNET_SCRB_Client;
  */
 struct GNUNET_SCRB_Policy;
 
-struct GNUNET_SCRB_MessageHeader
-{
-  /**
-   * Header for all multicast messages
-   */
-  struct GNUNET_MessageHeader header;
-
-  /**
-   * Message priority
-   */
-  uint32_t message_priority GNUNET_PACKED;
-	
-  /**
-   * ECC signature of the message fragment
-   * Signature must match the public key of the topic
-   */
-  struct GNUNET_CRYPTO_EddsaSignature signature;
-	
-  /**
-   * Purpose of the signature and size of the signed data
-   */
-  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
-
-  /**
-   * Message id
-   */
-  uint64_t message_id GNUNET_PACKED;
-
-  /**
-   * Source of the multicast message
-   */
-  struct GNUNET_HashCode source_id;
-	
-  /**
-   * Destination of the multicast message
-   */
-  struct GNUNET_HashCode dest_id;
-		
-  /**
-   * Followed by the message body
-   */
-    
-};
-
+/**
+ * Content type of the scribe message.
+ */
 enum GNUNET_SCRB_ContentType
 {
-  MSG, ANYCAST_MSG, MULTICAST_MSG, DHT_PUT
+  MSG, /*subscribe fail/ack message*/
+  ANYCAST_MSG, /*anycast message*/
+  MULTICAST_MSG,/*multicast message*/
+  DHT_PUT /*data of DHT put request*/
 };
 
 /**
@@ -108,15 +69,18 @@ enum GNUNET_SCRB_ContentType
 struct GNUNET_SCRB_Content
 {
   /**
-   * Data
+   * data
    */
-  char* data;
+  const char* app_data;
+
   /**
-   * Size
+   * size of @a data
    */
   size_t data_size;
+
   /**
-   * Content
+   * type of the content the scribe message
+   * carries
    */
   enum GNUNET_SCRB_ContentType type;
 };
@@ -128,23 +92,23 @@ struct GNUNET_SCRB_RoutePath
 {
   /**
    * Path of the message
+   * TO-DO: make the pointer possibly
+   * const
    */
   struct GNUNET_PeerIdentity* path;
   /**
-   * Size of the path
+   * Length of an array of peers (path length)
    */
   unsigned int path_length;
-  /**
-   * Where we are on the path
-   */	
-  unsigned int offset;
 };
-
 
 /**
  * Functions with the signature are called when an anycast is received for the group
  * which this client is subscribed. The client should return whether or not the
- * anycast should continue.
+ * anycast should continue. The client returns true only if it accepts the anycast
+ * message, in this case the anycast stops. Otherwise, the client returns false,
+ * that means that the anycast should continue searching for another possible
+ * recipient.
  *
  * @param cls        The callback closure
  * @param group_key  Public key of the group the message was anycasted for
@@ -250,8 +214,6 @@ typedef void
  * a subscription failure message
  * @param subs_ack_cb           The function is called when the client recieves
  * a subscription acknowledgement message
- * @param cont_cb               The function is called to continue the invoca-
- * tion queue
  * @param cls                   Callback closure
  * @return Handle for the client, NULL on error
  */
@@ -266,9 +228,7 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
 					  GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
 					  GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
 					  GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
-					  void* cb_cls,
-					  GNUNET_ContinuationCallback disconnect_cb,
-					  void* disconnect_cls);
+					  void* cb_cls);
 
 /**
  * Unsubscribes the given @a client from the group with the provided @a group_key.
@@ -283,7 +243,6 @@ void
 GNUNET_SCRB_unsubscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
 						const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 						const struct GNUNET_SCRB_Client* client,
-						GNUNET_ContinuationCallback cont_cb,
 						void* cls);
 
 /**
@@ -301,28 +260,9 @@ typedef size_t
 									 void* data);
 
 /**
- * Functions with the signature are used to make transmission messages for clients
- * anycasting content to group members
- *
- * @param cls        Closure
- * @param data_size  The number of bytes initially available in @a data.
- * @param data       A buffer to write the message body with at most @a data_size bytes.
- * @return           The message size
- */
-typedef size_t
-(*GNUNET_SCRB_AnycastTransmitNotify)(void* cls,
-									 size_t data_size, 
-									 void* data);
-
-/**
- * Handle for a request to send a message to all group members
+ * Handle for a request to send a publish message
  */
 struct GNUNET_SCRB_PublishTransmitHandle;
-
-/**
- * Handle for a request to send anycast messages to group members
- */
-struct GNUNET_SCRB_AnycastTransmitHandle;
 
 /**
  * Publishes @a content to a group with the given @a group_key.
@@ -330,8 +270,6 @@ struct GNUNET_SCRB_AnycastTransmitHandle;
  * @param cfg              Configuration handle
  * @param group_key        A public key of the group the content is published to
  * @param content          Content to publish
- * @param notify_cb        The callback to make a publish request message
- * @param notify_cls       Closure for the notification callback
  * @param cont_cb          Continuation callback
  * @param cls              Closure for the continuation calllback
  */
@@ -339,8 +277,6 @@ struct GNUNET_SCRB_PublishTransmitHandle*
 GNUNET_SCRB_publish(struct GNUNET_CONFIGURATION_Handle *cfg,
 					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 					const struct GNUNET_SCRB_Content* content,
-					GNUNET_SCRB_PublishTransmitNotify notify_cb,
-					void* notify_cls,
 					GNUNET_ContinuationCallback cont_cb,
 					void* cls);
 
@@ -352,41 +288,33 @@ GNUNET_SCRB_publish(struct GNUNET_CONFIGURATION_Handle *cfg,
  * @param content          Content to anycast
  * @param notify_cb        The callback to make an anycast message
  * @param notify_cls       Closure for the notification callback
- * @param cont_cb          Continuation callback
- * @param cls              Closure for the continuation calllback
  */
-struct GNUNET_SCRB_AnycastTransmitHandle*
+struct GNUNET_SCRB_PublishTransmitHandle*
 GNUNET_SCRB_anycast(const struct GNUNET_CONFIGURATION_Handle *cfg,
 					const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 					const struct GNUNET_SCRB_Content* content,
-					GNUNET_SCRB_AnycastTransmitNotify notify_cb,
-					void* notify_cls,
 					GNUNET_ContinuationCallback cont_cb,
 					void* cls);
 
 /**
  * Anycasts @a content to a member of a group with the given @a group_key.
  *
- * In the scibe original api: "Hint helps to implement centralized mechanisms
- * where the hint is the cached root of the topic. It enables us to do more
- * "effective" anycast exploiting more portions of the scribe tree."
+ * @a hint is an additional optimization constraint for a path finding
+ * algorithm. The @a hint can be as well the first peer on the path or
+ * the peer which the path should go through.
  *
  * @param cfg              Configuration handle
  * @param group_key        A public key of the group the content is anycasted
  * @param content          Content to anycast
  * @param notify_cb        The callback to make an anycast message
  * @param notify_cls       Closure for the notification callback
- * @param cont_cb          Continuation callback
- * @param cls              Closure for the continuation calllback
  */
-struct GNUNET_SCRB_AnycastTransmitHandle*
+struct GNUNET_SCRB_PublishTransmitHandle*
 GNUNET_SCRB_anycast_hint(const struct GNUNET_CONFIGURATION_Handle *cfg,
 						 const struct GNUNET_CRYPTO_EddsaPublicKey* group_key,
 						 const struct GNUNET_SCRB_Content* content,
 						 const struct GNUNET_PeerIdentity* hint,
-						 GNUNET_SCRB_AnycastTransmitNotify notify_cb,
-						 void* notify_cls,
-						 GNUNET_ContinuationCallback cont_cb, 
+						 GNUNET_ContinuationCallback cont_cb,
 						 void* cls);
 
 #if 0                           /* keep Emacsens' auto-indent happy */

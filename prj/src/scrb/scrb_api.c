@@ -35,16 +35,10 @@
 
 struct GNUNET_SCRB_PublishTransmitHandle
 {
-  GNUNET_SCRB_PublishTransmitNotify ptn_cb;
-  void* notify_cls;
+  const struct GNUNET_SCRB_Content* content;
+	GNUNET_ContinuationCallback cont_cb;
+	void* cls;
   struct GNUNET_SCRB_Client *client;	
-};
-
-struct GNUNET_SCRB_AnycastTransmitHandle
-{
-  GNUNET_SCRB_AnycastTransmitNotify atn_cb;
-  void* notify_cls;
-  struct GNUNET_SCRB_ClientSubscriber *sub;
 };
 
 struct GNUNET_SCRB_Client
@@ -70,25 +64,11 @@ struct GNUNET_SCRB_Client
   GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb;
   GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb;
   void* cb_cls;
-								
-  /**
-   * Function called after being disconnected from the service
-   */
-  GNUNET_ContinuationCallback disconnect_cb;
-
-  /**
-   * closure for @a disconnect_cb
-   */
-  void* disconnect_cls;
 	
   /**
    * Transmit handle for publishing content
    */
   struct GNUNET_SCRB_PublishTransmitHandle pth;
-  /**
-   * Transmit handle for anycasting content
-   */
-  struct GNUNET_SCRB_AnycastTransmitHandle ath;
 };
 
 /**
@@ -301,9 +281,7 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
 					  GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
 					  GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
 					  GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
-					  void* cb_cls,
-					  GNUNET_ContinuationCallback disconnect_cb,
-					  void* disconnect_cls)
+					  void* cb_cls)
 {
   struct GNUNET_SCRB_Client *sclient = GNUNET_malloc(sizeof(*sclient));
   struct GNUNET_SCRB_SubscribeMessage *sm = GNUNET_malloc(sizeof(*sm));
@@ -324,9 +302,6 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
   sclient->child_removed_cb = child_removed_cb;
   sclient->subs_fail_cb = subs_fail_cb;
   sclient->subs_ack_cb = subs_ack_cb;
-
-  sclient->disconnect_cb = disconnect_cb;
-  sclient->disconnect_cls = disconnect_cls;
 
   sclient->client = GNUNET_CLIENT_MANAGER_connect(cfg, "scrb", client_handlers);
   GNUNET_CLIENT_MANAGER_set_user_context_ (sclient->client, sclient, sizeof(*sclient));

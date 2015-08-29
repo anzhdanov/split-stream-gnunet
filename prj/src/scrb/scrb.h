@@ -19,8 +19,8 @@
 */
 /**
  * @file scrb/scrb.h
- * @brief example IPC messages between SCRB API and GNS service
- * @author Xi
+ * @brief scrb messages
+ * @author Alexander Zhdanov
  */
 
 #ifndef SCRB_H
@@ -31,6 +31,82 @@
 #include <gnunet/gnunet_crypto_lib.h>
 
 GNUNET_NETWORK_STRUCT_BEGIN
+
+/**
+ * Type of the group scribe message.
+ */
+enum GNUNET_SCRB_GroupMessageType
+{
+  GRP_SUBSCRIBE,
+  GRP_SUBSCRIBE_ACK,
+  GRP_SUBSCRIBE_FAIL,
+  GRP_ANYCAST,
+  GRP_ANYCAST_FAIL,
+  GRP_PUBLISH
+};
+
+/**
+ * A header for all scribe messages.
+ */ 
+struct GNUNET_SCRB_MessageHeader
+{
+  /**
+   * Header for all multicast messages
+   */
+  struct GNUNET_MessageHeader header;
+
+  /**
+   * Message priority
+   */
+  uint32_t message_priority GNUNET_PACKED;
+	
+  /**
+   * ECC signature of the message fragment
+   * Signature must match the public key of the topic
+   */
+  struct GNUNET_CRYPTO_EddsaSignature signature;
+	
+  /**
+   * Purpose of the signature and size of the signed data
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+  
+  /**
+   * The group the message is propagated
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey grp_key;
+    
+  /**
+   * The source address
+   */
+  struct GNUNET_PeerIdentity src;
+  
+  /**
+   * The destination address
+   */
+  struct GNUNET_PeerIdentity dst;
+  
+  /**
+   * uinque id
+   */
+  struct GNUNET_HashCode id;
+
+  /**
+   * Message id
+   */
+  uint64_t message_id GNUNET_PACKED;
+
+  /**
+   * Type of the group message
+   */
+  enum GNUNET_SCRB_GroupMessageType mtype;  
+	
+  /**
+   * Followed by the message body
+   */
+    
+};
+
 
 /**
  * A subscribe message

@@ -881,8 +881,8 @@ forward(enum GNUNET_DHT_RouteOption options,
 		memcpy(&msg->asrc, &my_identity, sizeof(struct GNUNET_PeerIdentity));
 		//we create a new PutJoin to send with anycast messages
 		struct PutJoin* put = create_put_join(options, data, path, path_length);
-		msg->content.data = GNUNET_malloc(sizeof(*put));
-		memcpy(msg->content.data, put, sizeof(*put));
+		msg->content.app_data = GNUNET_malloc(sizeof(*put));
+		memcpy(msg->content.app_data, put, sizeof(*put));
 		msg->content.data_size = sizeof(*put);
 		msg->content.type = DHT_PUT;
 		cadet_send_direct_anycast(&grp->pub_key, &msg->header, &my_identity, next);
@@ -1163,7 +1163,8 @@ cadet_send_downstream_msg (const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
 						   enum GNUNET_SCRB_ContentType ct, 
 						   const struct GNUNET_PeerIdentity* src,
 						   const struct GNUNET_PeerIdentity* dst)
-{	
+{
+  //FIXME: put the information into the scribe header
   struct GNUNET_SCRB_DownStreamMessage*
 	msg = GNUNET_malloc (sizeof(*msg));
   struct GNUNET_HashCode gkh;
@@ -1181,7 +1182,7 @@ cadet_send_downstream_msg (const struct GNUNET_CRYPTO_EddsaPublicKey* grp_key,
   msg->header.header.type = htons(GNUNET_MESSAGE_TYPE_SCRB_DWNSTRM_MSG);
   msg->header.header.size = htons(sizeof(*msg));
   //encapsulate a message
-  memcpy(msg->content.data, m, sizeof(*m));
+  memcpy(msg->content.app_data, m, sizeof(*m));
   msg->content.data_size = sizeof(*m);
   msg->content.type = ct;
   memcpy(&msg->grp_key, grp_key, sizeof(*grp_key));
@@ -1352,7 +1353,7 @@ recv_direct_anycast_handler(void* cls,
   {
 	//we have received the join put
 	//   a.2.1.1 call put dht handler on the anycast message content
-	struct PutJoin* put = (struct PutJoin*)content.data;
+	struct PutJoin* put = (struct PutJoin*)content.app_data;
 	forward(put->options, put->data, put->path.path, put->path. path_length, groups);
   }else // a.2.2 else
   {
@@ -1574,7 +1575,7 @@ cadet_recv_downstream_msg(void* cls,
   if(0 == memcmp(&my_identity, &msg->dst, sizeof(struct GNUNET_PeerIdentity)))
   {
 	//D.S.M.1.1 send the message down the stream
-	struct GNUNET_SCRB_MessageHeader* m = (struct GNUNET_SCRB_MessageHeader*)msg->content.data;
+	struct GNUNET_SCRB_MessageHeader* m = (struct GNUNET_SCRB_MessageHeader*)msg->content.app_data;
 	  //set our identity as the source
 	cadet_send_downstream_msg(&msg->grp_key, m, msg->content.type, &my_identity, &msg->dst);
 		
@@ -1585,7 +1586,7 @@ cadet_recv_downstream_msg(void* cls,
   //	D.S.M 2.1 if the content is message
   if(MSG == content.type)
   {
-	struct GNUNET_MessageHeader* m = (struct GNUNET_MessageHeader*)content.data;
+	struct GNUNET_MessageHeader* m = (struct GNUNET_MessageHeader*)content.app_data;
    		
 	if(GNUNET_MESSAGE_TYPE_SCRB_SUBSCRIBE_FAIL == ntohs(m->type))
 	{

@@ -108,7 +108,8 @@ struct GNUNET_SCRB_RoutePath
  * anycast should continue. The client returns true only if it accepts the anycast
  * message, in this case the anycast stops. Otherwise, the client returns false,
  * that means that the anycast should continue searching for another possible
- * recipient.
+ * recipient. For the split-stream, this is a resource allocation decision by
+ * the application/client.
  *
  * @param cls        The callback closure
  * @param group_key  Public key of the group the message was anycasted for
@@ -194,6 +195,11 @@ typedef void
  * deletion of the group members using @a child_added_cb and @a child_del_cb
  * callbacks.
  *
+ * Separately, in the API, it is set @a disconnect_cb. The function with the
+ * signature is called when the client got disconnected from the service. The
+ * previuos callbacks according to their semantics cannot be used to clearly
+ * indicate that the client is disconnected.
+ *
  * The API does not have a particular create/destroy group methods. The function-
  * ality allows to create groups implicitly.
  *
@@ -214,6 +220,8 @@ typedef void
  * a subscription failure message
  * @param subs_ack_cb           The function is called when the client recieves
  * a subscription acknowledgement message
+ * @param disconnect_cb         The function is called when the client got dis-
+ * connected from the service
  * @param cls                   Callback closure
  * @return Handle for the client, NULL on error
  */
@@ -228,6 +236,7 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
 					  GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
 					  GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
 					  GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
+					  GNUNET_ContinuationCallback disconnect_cb,
 					  void* cb_cls);
 
 /**
@@ -282,6 +291,9 @@ GNUNET_SCRB_publish(struct GNUNET_CONFIGURATION_Handle *cfg,
 
 /**
  * Anycasts @a content to a member of a group with the given @a group_key.
+ * @a content should include an authentication message. It does not contain
+ * any real payload. The client uses @a content to send an application-spe-
+ * cific data to the service to introduce itself (authenticate).
  *
  * @param cfg              Configuration handle
  * @param group_key        A public key of the group the content is anycasted to
@@ -299,9 +311,8 @@ GNUNET_SCRB_anycast(const struct GNUNET_CONFIGURATION_Handle *cfg,
 /**
  * Anycasts @a content to a member of a group with the given @a group_key.
  *
- * @a hint is an additional optimization constraint for a path finding
- * algorithm. The @a hint can be as well the first peer on the path or
- * the peer which the path should go through.
+ * @a hint is a cached root of the group. This is a hint to avoid a DHT lookup to 
+ * instantly identify the root of the MC tree.
  *
  * @param cfg              Configuration handle
  * @param group_key        A public key of the group the content is anycasted

@@ -36,8 +36,8 @@
 struct GNUNET_SCRB_PublishTransmitHandle
 {
   const struct GNUNET_SCRB_Content* content;
-	GNUNET_ContinuationCallback cont_cb;
-	void* cls;
+  GNUNET_ContinuationCallback cont_cb;
+  void* cls;
   struct GNUNET_SCRB_Client *client;	
 };
 
@@ -63,6 +63,7 @@ struct GNUNET_SCRB_Client
   GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb;
   GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb;
   GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb;
+  GNUNET_ContinuationCallback disconnect_cb;
   void* cb_cls;
 	
   /**
@@ -81,7 +82,6 @@ client_send_connect_msg (struct GNUNET_SCRB_Client *sclient)
   struct GNUNET_MessageHeader *cmsg = GNUNET_malloc(cmsg_size);
   memcpy(cmsg, sclient->connect_msg, cmsg_size);
   GNUNET_CLIENT_MANAGER_transmit_now(sclient->client, cmsg);
-
 }
 
 /**
@@ -265,8 +265,8 @@ static struct GNUNET_CLIENT_MANAGER_MessageHandler client_handlers[] =
  * a subscription failure message
  * @param subs_ack_cb           The function is called when the client recieves
  * a subscription acknowledgement message
- * @param cont_cb               The function is called to continue the invoca-
- * tion queue
+ * @param disconnect_cb         The function is called when the client got dis-
+ * connected from the service
  * @param cls                   Callback closure
  * @return Handle for the client, NULL on error
  */
@@ -281,6 +281,7 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
 					  GNUNET_SCRB_ClientChildRemovedCallback child_removed_cb,
 					  GNUNET_SCRB_ClientSubscribeFailedCallback subs_fail_cb,
 					  GNUNET_SCRB_ClientSubscribeSuccessCallback subs_ack_cb,
+					  GNUNET_ContinuationCallback disconnect_cb,
 					  void* cb_cls)
 {
   struct GNUNET_SCRB_Client *sclient = GNUNET_malloc(sizeof(*sclient));
@@ -302,6 +303,7 @@ GNUNET_SCRB_subscribe(const struct GNUNET_CONFIGURATION_Handle *cfg,
   sclient->child_removed_cb = child_removed_cb;
   sclient->subs_fail_cb = subs_fail_cb;
   sclient->subs_ack_cb = subs_ack_cb;
+  sclient->disconnect_cb = disconnect_cb;
 
   sclient->client = GNUNET_CLIENT_MANAGER_connect(cfg, "scrb", client_handlers);
   GNUNET_CLIENT_MANAGER_set_user_context_ (sclient->client, sclient, sizeof(*sclient));

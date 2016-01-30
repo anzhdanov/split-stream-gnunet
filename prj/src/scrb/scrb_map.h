@@ -24,10 +24,10 @@ struct GNUNET_SCRB_RouteMap;
  */
 typedef int
 (*GNUNET_SCRB_MapPutPath) (struct GNUNET_SCRB_RouteMap* route_map,
-  const struct GNUNET_HashCode* grp_key_hash,
-	const struct GNUNET_PeerIdentity* path,
-	unsigned int path_length,
-	void* cls);
+                           const struct GNUNET_HashCode* grp_key_hash,
+	                       const struct GNUNET_PeerIdentity* path,
+ 	                       unsigned int path_length,
+	                       void* cls);
 
 /**
  * Functions with the signatures are called to remove path from the
@@ -42,10 +42,10 @@ typedef int
  */
 typedef int
 (*GNUNET_SCRB_MapRemovePath) (struct GNUNET_SCRB_RouteMap* route_map,
-  const struct GNUNET_HashCode* grp_key_hash,
-	const struct GNUNET_PeerIdentity* path,
-	unsigned int path_length,
-	void* cls);
+                              const struct GNUNET_HashCode* grp_key_hash,
+	                          const struct GNUNET_PeerIdentity* path,
+	                          unsigned int path_length,
+	                          void* cls);
 	
 /**
  * Functions with the signatures are called to check if the path is
@@ -60,10 +60,10 @@ typedef int
  */
 typedef int
 (*GNUNET_SCRB_MapContainPath) (struct GNUNET_SCRB_RouteMap* route_map,
-  const struct GNUNET_HashCode* grp_key_hash,
-	const struct GNUNET_PeerIdentity* path,
-	unsigned int path_length,
-	void* cls);
+                               const struct GNUNET_HashCode* grp_key_hash,
+	                           const struct GNUNET_PeerIdentity* path,
+	                           unsigned int path_length,
+	                           void* cls);
 	
 /**
  * Functions with the signatures are called to get a path for the provided
@@ -78,12 +78,12 @@ typedef int
  */
 typedef void
 (*GNUNET_SCRB_MapGetPath) (struct GNUNET_SCRB_RouteMap* route_map,
-  const struct GNUNET_HashCode* grp_key_hash,
-	const struct GNUNET_PeerIdentity* start,
-	const struct GNUNET_PeerIdentity* end,
-	struct GNUNET_PeerIdentity* path,
-	unsigned int* path_length,
-	void* cls);
+                           const struct GNUNET_HashCode* grp_key_hash,
+                           const struct GNUNET_PeerIdentity* start,
+                           const struct GNUNET_PeerIdentity* end,
+                           struct GNUNET_PeerIdentity* path,
+                           unsigned int* path_length,
+                           void* cls);
 
 /**
  * Creates a scribe route map
@@ -96,10 +96,10 @@ typedef void
  */
 struct GNUNET_SCRB_RouteMap*
 GNUNET_SCRB_create_route_map(GNUNET_SCRB_MapPutPath map_put_path_cb,
-	            GNUNET_SCRB_MapRemovePath map_remove_path_cb,
-	            GNUNET_SCRB_MapContainPath map_contain_path_cb,
-	            GNUNET_SCRB_MapGetPath map_get_path_cb,
-						  void* cls);
+                             GNUNET_SCRB_MapRemovePath map_remove_path_cb,
+                             GNUNET_SCRB_MapContainPath map_contain_path_cb,
+                             GNUNET_SCRB_MapGetPath map_get_path_cb,
+                             void* cls);
 
 struct GNUNET_SCRB_RouteMap*
 GNUNET_SCRB_create_route_map_def();
@@ -117,7 +117,6 @@ struct GNUNET_SCRB_RouteMap
 	GNUNET_SCRB_MapGetPath map_get_path_cb;
 	
 	void* cls;
-		
 };
 
 #endif

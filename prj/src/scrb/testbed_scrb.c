@@ -272,37 +272,36 @@ test_master (void *cls,
 			 unsigned int links_succeeded,
 			 unsigned int links_failed)
 {
-  /*
-	if (NULL == peers)
-	{
+  if (NULL == peers)
+  {
 	GNUNET_SCHEDULER_add_now (&shutdown_task, NULL);
-	}
-
-	guardians = peers;
-	struct SCRBPeer* current_peer;
-	unsigned int i;
-	for(i = 0; i < num_peers; i++){
+  }
+	
+  guardians = peers;
+  struct SCRBPeer* current_peer;
+  unsigned int i;
+  for(i = 0; i < num_peers; i++){
 	current_peer = GNUNET_new(struct SCRBPeer);
 	current_peer->guardian = guardians[i];
 	current_peer->id = i;
 	current_peer->scrb_op = 
-	GNUNET_TESTBED_service_connect
-	(NULL,*/      /* Closure for operation */
-  //				peers[i],  /* The peer whose service to connect to */
-  //				"scrb",    /* The name of the service */
-  //				service_connect_pub, /* callback to call after a handle to
-  //                                            service is opened */
-  //				current_peer, /* closure for the above callback */
-  //				scrb_connect, /* callback to call with peer's
-  //                                  configuration; this should open the needed
-  //                                  service connection */
-  //					scrb_disconnect, /* callback to be called when closing the
-  //                                     opened service connection */
-  //				current_peer); /* closure for the above two callbacks */
-  //GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
-  //}
-  //shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_HOURS,
-  //		&shutdown_task, NULL);
+	  GNUNET_TESTBED_service_connect
+	  (NULL,      /* Closure for operation */
+	   peers[i],  /* The peer whose service to connect to */
+	   "scrb",    /* The name of the service */
+	   service_connect_pub, /* callback to call after a handle to
+							   service is opened */
+	   current_peer, /* closure for the above callback */
+	   scrb_connect, /* callback to call with peer's
+						configuration; this should open the needed
+						service connection */
+	   scrb_disconnect, /* callback to be called when closing the
+						   opened service connection */
+	   current_peer); /* closure for the above two callbacks */
+	GNUNET_CONTAINER_DLL_insert (peer_head, peer_tail, current_peer);
+  }
+  shutdown_tid = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_HOURS,
+											   &shutdown_task, NULL);
 }
 
 

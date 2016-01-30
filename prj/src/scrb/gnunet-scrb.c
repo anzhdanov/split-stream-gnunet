@@ -21,7 +21,7 @@
 /**
  * @file scrb/gnunet-scrb.c
  * @brief scrb tool
- * @author 
+ * @author azhdanov 
  */
 #include <gnunet/platform.h>
 #include <gnunet/gnunet_util_lib.h>

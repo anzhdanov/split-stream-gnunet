@@ -21,7 +21,7 @@
 /**
  * @file scrb/scrb_api.c
  * @brief API for scrb
- * @author +azhdanov+
+ * @author azhdanov
  */
 
 
